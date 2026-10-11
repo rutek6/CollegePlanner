@@ -20,9 +20,12 @@
 // ZAJECIA należą do ostatniego PRZEDMIOTU, GRUPA do ostatnich ZAJEC,
 // a linia z dniem tygodnia to termin (slot) ostatniej GRUPY.
 //
+// Obiekty dostają id w kolejności występowania w pliku, więc grupy jednego
+// pod-przedmiotu (i pod-przedmioty jednego przedmiotu) mają kolejne id.
+//
 // Przy błędnych danych wypisuje komunikat na stderr i kończy program.
 // ---------------------------------------------------------------------------
-std::vector<course> read_courses(std::istream &in);
+catalog read_catalog(std::istream &in);
 
 // Usuwa białe znaki z początku i końca napisu.
 std::string trim(const std::string &s);

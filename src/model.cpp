@@ -32,12 +32,12 @@ bool group::is_conflict(group second) const {
     return false;
 }
 
-size_t plan::calculate_conflicts(const std::vector<sub_course> &sub_courses) {
+size_t plan::calculate_conflicts(const std::vector<group> &groups) {
     size_t nr_of_conflicts = 0;
     for (size_t i = 0; i < chosen.size(); i++) {
-        const group &a = sub_courses[i].groups[chosen[i]];
+        const group &a = groups[chosen[i]];
         for (size_t j = i + 1; j < chosen.size(); j++) {
-            const group &b = sub_courses[j].groups[chosen[j]];
+            const group &b = groups[chosen[j]];
             if (a.is_conflict(b)) {
                 nr_of_conflicts++;
             }

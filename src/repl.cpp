@@ -9,17 +9,16 @@
 
 using namespace std;
 
-vector<int> ask_for_groups(const vector<course> &courses) {
-    int index = 0;
+vector<int> ask_for_groups(const catalog &cat) {
     cout << "\nWybierz grupy: ";
-    for (course c : courses) {
+    for (const course &c : cat.courses) {
         cout << "\n" << c.name;
-        for (sub_course sub : c.sub_courses) {
-            for (group g : sub.groups) {
+        for (int sub_id : c.sub_ids) {
+            const sub_course &sub = cat.sub_courses[sub_id];
+            for (int group_id : sub.group_ids) {
                 cout << "\n"
-                     << index << ": " << g.nr << " - "
+                     << group_id << ": " << cat.groups[group_id].nr << " - "
                      << type_names[sub.class_type];
-                index++;
             }
         }
     }
@@ -34,7 +33,8 @@ vector<int> ask_for_groups(const vector<course> &courses) {
         try {
             size_t parsed;
             int id = stoi(line, &parsed);
-            if (parsed != line.size() || id < 0 || id >= index) {
+            if (parsed != line.size() || id < 0 ||
+                id >= (int)cat.groups.size()) {
                 throw out_of_range(line);
             }
             result.push_back(id);

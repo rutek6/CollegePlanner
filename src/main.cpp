@@ -21,10 +21,9 @@ int main(int argc, char *argv[]) {
         cerr << "Nie można otworzyć pliku \"" << argv[1] << "\"\n";
         return 1;
     }
-    vector<course> selected_courses = read_courses(input);
-    // vector<int> required_group_ids = ask_for_groups(selected_courses);
+    catalog cat = read_catalog(input);
     prefs preferences;
-    preferences.required_group_ids = ask_for_groups(selected_courses);
+    preferences.required_group_ids = ask_for_groups(cat);
 
     if (argc == 3) {
         ifstream input(argv[2]);
@@ -35,6 +34,6 @@ int main(int argc, char *argv[]) {
         read_prefs(preferences.hours, preferences.free_days, input);
     }
 
-    plan best = generate_plans(selected_courses, preferences);
-    print_plan(best, selected_courses, cout);
+    plan best = generate_plans(cat, preferences);
+    print_plan(best, cat, cout);
 }

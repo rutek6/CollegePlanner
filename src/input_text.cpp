@@ -48,8 +48,8 @@ bool parse_time_range(const string &s, int &start, int &end) {
     return true;
 }
 
-vector<course> read_courses(istream &in) {
-    vector<course> courses;
+catalog read_catalog(istream &in) {
+    catalog cat;
     string line;
     int line_nr = 0;
 
@@ -77,10 +77,10 @@ vector<course> read_courses(istream &in) {
             }
             course c;
             c.name = rest;
-            courses.push_back(c);
+            cat.courses.push_back(c);
         }
         else if (keyword == "ZAJECIA") {
-            if (courses.empty()) {
+            if (cat.courses.empty()) {
                 input_error(line_nr, "ZAJECIA przed pierwszym PRZEDMIOTEM");
             }
             int t = find_name(type_names, type_count, rest);
@@ -89,10 +89,14 @@ vector<course> read_courses(istream &in) {
             }
             sub_course sub;
             sub.class_type = static_cast<type>(t);
-            courses.back().sub_courses.push_back(sub);
+            sub.course_id = cat.courses.size() - 1;
+            cat.courses.back().sub_ids.push_back(cat.sub_courses.size());
+            cat.sub_courses.push_back(sub);
         }
         else if (keyword == "GRUPA") {
-            if (courses.empty() || courses.back().sub_courses.empty()) {
+            // sub_courses.back() to ostatnie ZAJECIA ostatniego PRZEDMIOTU
+            // tylko wtedy, gdy ten przedmiot ma już jakieś ZAJECIA.
+            if (cat.courses.empty() || cat.courses.back().sub_ids.empty()) {
                 input_error(line_nr, "GRUPA przed pierwszymi ZAJECIAMI");
             }
             group g;
@@ -101,11 +105,13 @@ vector<course> read_courses(istream &in) {
                 input_error(line_nr,
                             "niepoprawny numer grupy \"" + rest + "\"");
             }
-            courses.back().sub_courses.back().groups.push_back(g);
+            g.sub_id = cat.sub_courses.size() - 1;
+            cat.sub_courses.back().group_ids.push_back(cat.groups.size());
+            cat.groups.push_back(g);
         }
         else if (find_name(day_names, day_count, keyword) >= 0) {
-            if (courses.empty() || courses.back().sub_courses.empty() ||
-                courses.back().sub_courses.back().groups.empty()) {
+            if (cat.courses.empty() || cat.courses.back().sub_ids.empty() ||
+                cat.sub_courses.back().group_ids.empty()) {
                 input_error(line_nr, "termin zajęć przed pierwszą GRUPĄ");
             }
             slot s;
@@ -117,7 +123,7 @@ vector<course> read_courses(istream &in) {
             if (s.start >= s.end) {
                 input_error(line_nr, "początek zajęć nie jest przed końcem");
             }
-            courses.back().sub_courses.back().groups.back().slots.push_back(s);
+            cat.groups.back().slots.push_back(s);
         }
         else {
             input_error(line_nr, "nieznane słowo kluczowe \"" + keyword + "\"");
@@ -125,14 +131,15 @@ vector<course> read_courses(istream &in) {
     }
 
     // Przedmiot bez zajęć albo zajęcia bez grup uniemożliwiają ułożenie planu.
-    for (const course &c : courses) {
-        if (c.sub_courses.empty()) {
+    for (const course &c : cat.courses) {
+        if (c.sub_ids.empty()) {
             cerr << "Błąd danych wejściowych: przedmiot \"" << c.name
                  << "\" nie ma żadnych ZAJEC\n";
             exit(1);
         }
-        for (const sub_course &sub : c.sub_courses) {
-            if (sub.groups.empty()) {
+        for (int sub_id : c.sub_ids) {
+            const sub_course &sub = cat.sub_courses[sub_id];
+            if (sub.group_ids.empty()) {
                 cerr << "Błąd danych wejściowych: zajęcia "
                      << type_names[sub.class_type] << " przedmiotu \"" << c.name
                      << "\" nie mają żadnej GRUPY\n";
@@ -141,7 +148,7 @@ vector<course> read_courses(istream &in) {
         }
     }
 
-    return courses;
+    return cat;
 }
 
 void read_prefs(std::tuple<int, int> *hours,

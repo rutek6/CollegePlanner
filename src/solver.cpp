@@ -6,12 +6,9 @@
 
 using namespace std;
 
-bool group_fits_prefs(int group_index,
-                      int sub_course_index,
-                      const vector<sub_course> &sub_courses,
-                      const prefs &preferences) {
+bool group_fits_prefs(const group &g, const prefs &preferences) {
 
-    for (slot s : sub_courses[sub_course_index].groups[group_index].slots) {
+    for (slot s : g.slots) {
         for (int i = 0; i < 5; i++) {
             if (s.day == i && (s.start < get<0>(preferences.hours[i]) ||
                                s.end > get<1>(preferences.hours[i]))) {
@@ -28,7 +25,7 @@ bool group_fits_prefs(int group_index,
 void dfs(plan current_plan,
          plan &result,
          size_t &result_conflicts,
-         const vector<sub_course> &sub_courses,
+         const vector<group> &groups,
          const vector<vector<int>> &allowed,
          const prefs &preferences,
          int index,
@@ -38,7 +35,7 @@ void dfs(plan current_plan,
     //     return;
     // }
     if (index == end) {
-        size_t conflicts = current_plan.calculate_conflicts(sub_courses);
+        size_t conflicts = current_plan.calculate_conflicts(groups);
         if (conflicts < result_conflicts) {
             result = current_plan;
             result.conflicts = conflicts;
@@ -47,58 +44,47 @@ void dfs(plan current_plan,
         return;
     }
 
-    for (int group_index : allowed[index]) {
-        if (!group_fits_prefs(group_index, index, sub_courses, preferences)) {
+    for (int group_id : allowed[index]) {
+        if (!group_fits_prefs(groups[group_id], preferences)) {
             continue;
         }
-        current_plan.chosen.push_back(group_index);
-        size_t current_conflicts =
-            current_plan.calculate_conflicts(sub_courses);
+        current_plan.chosen.push_back(group_id);
+        size_t current_conflicts = current_plan.calculate_conflicts(groups);
 
         if (current_conflicts >= result_conflicts) {
             current_plan.chosen.pop_back();
             continue;
         }
 
-        dfs(current_plan, result, result_conflicts, sub_courses, allowed,
+        dfs(current_plan, result, result_conflicts, groups, allowed,
             preferences, index + 1, end);
 
         current_plan.chosen.pop_back();
     }
 }
 
-plan generate_plans(vector<course> selected_courses, prefs preferences) {
+plan generate_plans(const catalog &cat, prefs preferences) {
     plan result;
     size_t result_conflicts = SIZE_MAX; // każdy pełny plan będzie lepszy
 
-    // sub_courses - wszystkie pod-przedmioty po kolei, bez filtrowania,
-    // żeby indeksy w plan::chosen odpowiadały indeksom w selected_courses.
-    // allowed[k] - indeksy grup k-tego pod-przedmiotu, które dfs rozważa.
-    vector<sub_course> sub_courses;
+    // allowed[k] - id grup pod-przedmiotu k, które dfs rozważa: przypięte,
+    // a jeśli w tym pod-przedmiocie nic nie przypięto - wszystkie.
     vector<vector<int>> allowed;
-    int id = 0;
 
-    for (const course &c : selected_courses) {
-        for (const sub_course &sub : c.sub_courses) {
-            vector<int> required;
-            vector<int> all;
-            for (int i = 0; i < (int)sub.groups.size(); i++) {
-                if (find(preferences.required_group_ids.begin(),
-                         preferences.required_group_ids.end(),
-                         id) != preferences.required_group_ids.end()) {
-                    required.push_back(i);
-                }
-                all.push_back(i);
-                id++;
+    for (const sub_course &sub : cat.sub_courses) {
+        vector<int> required;
+        for (int group_id : sub.group_ids) {
+            if (find(preferences.required_group_ids.begin(),
+                     preferences.required_group_ids.end(),
+                     group_id) != preferences.required_group_ids.end()) {
+                required.push_back(group_id);
             }
-
-            sub_courses.push_back(sub);
-            allowed.push_back(required.empty() ? all : required);
         }
+        allowed.push_back(required.empty() ? sub.group_ids : required);
     }
 
     plan new_plan;
-    dfs(new_plan, result, result_conflicts, sub_courses, allowed, preferences,
-        0, sub_courses.size());
+    dfs(new_plan, result, result_conflicts, cat.groups, allowed, preferences,
+        0, cat.sub_courses.size());
     return result;
 }
