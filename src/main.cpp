@@ -24,7 +24,6 @@ int main(int argc, char *argv[]) {
     }
     catalog cat = read_catalog(input);
     prefs preferences;
-    preferences.required_group_ids = ask_for_groups(cat);
 
     if (argc == 3) {
         ifstream input(argv[2]);
@@ -32,7 +31,7 @@ int main(int argc, char *argv[]) {
             cerr << "Nie można otworzyć pliku \"" << argv[1] << "\"\n";
             return 1;
         }
-        read_prefs(preferences.hours, preferences.free_days, input);
+        read_prefs(preferences, cat, input, cout);
     }
     vector<vector<bool>> conflicts = create_conflict_graph(cat);
     plan best = generate_plans(cat, preferences, conflicts);

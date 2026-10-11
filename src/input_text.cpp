@@ -1,9 +1,12 @@
 #include "input_text.h"
 
+#include "preferences.h"
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
+#include <set>
 #include <sstream>
+#include <unordered_set>
 
 using namespace std;
 
@@ -161,10 +164,85 @@ bool cut_suffix(string &key, const string &suffix) {
     return true;
 }
 
-void read_prefs(std::tuple<int, int> *hours,
-                bool *free_days,
-                std::istream &in) {
+int parse_group_id(const string &line, const catalog &cat, ostream &out) {
+    istringstream input(line);
+    string name, type_string;
+    int nr;
+    input >> name;
+    input >> type_string;
+    input >> nr;
 
+    set<string> course_name_candidates;
+    for (const course &c : cat.courses) {
+        course_name_candidates.insert(c.name);
+    }
+
+    for (size_t i = 0; i < name.length(); i++) {
+        for (auto it = course_name_candidates.begin();
+             it != course_name_candidates.end();) {
+            string s = *it;
+            if (s.length() < name.length() || name[i] != s[i]) {
+                it = course_name_candidates.erase(it);
+            }
+            else {
+                ++it;
+            }
+        }
+    }
+
+    switch (course_name_candidates.size()) {
+    case 0:
+        out << "brak pasujących nazw\n";
+        return -1;
+    case 1:
+        out << "ZNALEZIONO: " << *course_name_candidates.begin() << "\n";
+        break;
+    default:
+        out << "WIELE MOŻLIWOŚCI: \n";
+        for (string s : course_name_candidates) {
+            out << s << endl;
+        }
+        return -1;
+    }
+
+    string course_name = *course_name_candidates.begin();
+    course selected_course;
+    for (const course &c : cat.courses) {
+        if (c.name == course_name) {
+            selected_course = c;
+            break;
+        }
+    }
+
+    sub_course selected_sub_course;
+    bool is_found = false;
+    for (size_t i = 0; i < selected_course.sub_ids.size(); i++) {
+
+        if (cat.sub_courses[selected_course.sub_ids[i]].class_type ==
+            static_cast<type>(find_name(type_names, type_count, type_string))) {
+            selected_sub_course = cat.sub_courses[selected_course.sub_ids[i]];
+            is_found = true;
+        }
+    }
+    if (!is_found) {
+        cerr << "NIE ZNALEZIONO TYPU" << endl;
+        return -1;
+    }
+
+    int group_number = static_cast<int>(nr);
+    group selected_group;
+    for (int id : selected_sub_course.group_ids) {
+        if (cat.groups[id].nr == group_number) {
+            return id;
+        }
+    }
+    return -1;
+}
+
+void read_prefs(prefs &preferences,
+                const catalog &cat,
+                std::istream &in,
+                std::ostream &out) {
     string line;
     int line_nr = 0;
     while (getline(in, line)) {
@@ -196,8 +274,8 @@ void read_prefs(std::tuple<int, int> *hours,
                 input_error(line_nr, "początek zajęć nie jest przed końcem");
             }
 
-            get<0>(hours[day]) = start;
-            get<1>(hours[day]) = end;
+            get<0>(preferences.hours[day]) = start;
+            get<1>(preferences.hours[day]) = end;
         }
         else if (cut_suffix(key, "CzyWolne")) {
             int day = find_name(day_names, 5, key);
@@ -206,14 +284,21 @@ void read_prefs(std::tuple<int, int> *hours,
             }
             value = trim(value);
             if (value == "true") {
-                free_days[day] = true;
+                preferences.free_days[day] = true;
             }
             else if (value == "false") {
-                free_days[day] = false;
+                preferences.free_days[day] = false;
             }
             else {
                 input_error(line_nr, "niepoprawne dane\"");
             }
+        }
+        else if (key == "Przypnij") {
+            int group_id = parse_group_id(value, cat, out);
+            if (group_id == -1) {
+                input_error(line_nr, "nieznana grupa \"" + value + "\"");
+            }
+            preferences.required_group_ids.push_back(group_id);
         }
         else {
             input_error(line_nr, "nieznany klucz \"" + key + "\"");

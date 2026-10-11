@@ -37,7 +37,7 @@ plan::calculate_conflicts(const std::vector<std::vector<bool>> &conflicts) {
     size_t nr_of_conflicts = 0;
     for (size_t i = 0; i < chosen.size(); i++) {
         for (size_t j = i + 1; j < chosen.size(); j++) {
-            if (conflicts[i][j]) {
+            if (conflicts[chosen[i]][chosen[j]]) {
                 nr_of_conflicts++;
             }
         }

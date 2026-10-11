@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "model.h"
+#include "preferences.h"
 
 // ---------------------------------------------------------------------------
 // Wczytywanie danych
@@ -30,4 +31,7 @@ catalog read_catalog(std::istream &in);
 // Usuwa białe znaki z początku i końca napisu.
 std::string trim(const std::string &s);
 
-void read_prefs(std::tuple<int, int> *hours, bool *free_days, std::istream &in);
+void read_prefs(prefs &preferences,
+                const catalog &cat,
+                std::istream &in,
+                std::ostream &out);
