@@ -60,5 +60,5 @@ class plan {
     // chosen[k] = id grupy wybranej w pod-przedmiocie o id k
     std::vector<int> chosen;
     size_t conflicts = 0; // ustawiane przez solver
-    size_t calculate_conflicts(const std::vector<group> &groups);
+    size_t calculate_conflicts(const std::vector<std::vector<bool>> &conflicts);
 };

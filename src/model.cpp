@@ -22,8 +22,8 @@ bool slot::is_conflict(slot second) const {
 }
 
 bool group::is_conflict(group second) const {
-    for (int i = 0; i < slots.size(); i++) {
-        for (int j = 0; j < second.slots.size(); j++) {
+    for (size_t i = 0; i < slots.size(); i++) {
+        for (size_t j = 0; j < second.slots.size(); j++) {
             if (slots[i].is_conflict(second.slots[j])) {
                 return true;
             }
@@ -32,13 +32,12 @@ bool group::is_conflict(group second) const {
     return false;
 }
 
-size_t plan::calculate_conflicts(const std::vector<group> &groups) {
+size_t
+plan::calculate_conflicts(const std::vector<std::vector<bool>> &conflicts) {
     size_t nr_of_conflicts = 0;
     for (size_t i = 0; i < chosen.size(); i++) {
-        const group &a = groups[chosen[i]];
         for (size_t j = i + 1; j < chosen.size(); j++) {
-            const group &b = groups[chosen[j]];
-            if (a.is_conflict(b)) {
+            if (conflicts[i][j]) {
                 nr_of_conflicts++;
             }
         }

@@ -2,6 +2,7 @@
 #include <iostream>
 #include <vector>
 
+#include "conflict.h"
 #include "input_text.h"
 #include "model.h"
 #include "output.h"
@@ -33,7 +34,7 @@ int main(int argc, char *argv[]) {
         }
         read_prefs(preferences.hours, preferences.free_days, input);
     }
-
-    plan best = generate_plans(cat, preferences);
+    vector<vector<bool>> conflicts = create_conflict_graph(cat);
+    plan best = generate_plans(cat, preferences, conflicts);
     print_plan(best, cat, cout);
 }

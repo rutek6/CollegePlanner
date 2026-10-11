@@ -7,7 +7,6 @@
 using namespace std;
 
 bool group_fits_prefs(const group &g, const prefs &preferences) {
-
     for (slot s : g.slots) {
         for (int i = 0; i < 5; i++) {
             if (s.day == i && (s.start < get<0>(preferences.hours[i]) ||
@@ -25,6 +24,7 @@ bool group_fits_prefs(const group &g, const prefs &preferences) {
 void dfs(plan current_plan,
          plan &result,
          size_t &result_conflicts,
+         const vector<vector<bool>> &conflicts,
          const vector<group> &groups,
          const vector<vector<int>> &allowed,
          const prefs &preferences,
@@ -35,11 +35,11 @@ void dfs(plan current_plan,
     //     return;
     // }
     if (index == end) {
-        size_t conflicts = current_plan.calculate_conflicts(groups);
-        if (conflicts < result_conflicts) {
+        size_t nr_of_conflicts = current_plan.calculate_conflicts(conflicts);
+        if (nr_of_conflicts < result_conflicts) {
             result = current_plan;
-            result.conflicts = conflicts;
-            result_conflicts = conflicts;
+            result.conflicts = nr_of_conflicts;
+            result_conflicts = nr_of_conflicts;
         }
         return;
     }
@@ -49,21 +49,23 @@ void dfs(plan current_plan,
             continue;
         }
         current_plan.chosen.push_back(group_id);
-        size_t current_conflicts = current_plan.calculate_conflicts(groups);
+        size_t current_conflicts = current_plan.calculate_conflicts(conflicts);
 
         if (current_conflicts >= result_conflicts) {
             current_plan.chosen.pop_back();
             continue;
         }
 
-        dfs(current_plan, result, result_conflicts, groups, allowed,
+        dfs(current_plan, result, result_conflicts, conflicts, groups, allowed,
             preferences, index + 1, end);
 
         current_plan.chosen.pop_back();
     }
 }
 
-plan generate_plans(const catalog &cat, prefs preferences) {
+plan generate_plans(const catalog &cat,
+                    prefs preferences,
+                    const vector<vector<bool>> &conflicts) {
     plan result;
     size_t result_conflicts = SIZE_MAX; // każdy pełny plan będzie lepszy
 
@@ -84,7 +86,7 @@ plan generate_plans(const catalog &cat, prefs preferences) {
     }
 
     plan new_plan;
-    dfs(new_plan, result, result_conflicts, cat.groups, allowed, preferences,
-        0, cat.sub_courses.size());
+    dfs(new_plan, result, result_conflicts, conflicts, cat.groups, allowed,
+        preferences, 0, cat.sub_courses.size());
     return result;
 }
