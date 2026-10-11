@@ -151,36 +151,72 @@ catalog read_catalog(istream &in) {
     return cat;
 }
 
+// Jeśli key kończy się na suffix, obcina go i zwraca true.
+bool cut_suffix(string &key, const string &suffix) {
+    if (key.size() < suffix.size() ||
+        key.compare(key.size() - suffix.size(), suffix.size(), suffix) != 0) {
+        return false;
+    }
+    key.erase(key.size() - suffix.size());
+    return true;
+}
+
 void read_prefs(std::tuple<int, int> *hours,
                 bool *free_days,
                 std::istream &in) {
+
     string line;
     int line_nr = 0;
     while (getline(in, line)) {
         line_nr++;
-        if (line_nr <= 5) {
+
+        string value, key;
+        istringstream tokens(line);
+        tokens >> key;
+        getline(tokens, value);
+        value = trim(value);
+        if (key.empty()) {
+            continue;
+        }
+
+        if (cut_suffix(key, "Godziny")) {
+            int day = find_name(day_names, 5, key);
+
+            if (day < 0) {
+                input_error(line_nr, "nieznany dzień \"" + key + "\"");
+            }
+
             int start, end;
-            if (!parse_time_range(line, start, end)) {
-                input_error(line_nr, "niepoprawny przedział czasu \"" + line +
+            if (!parse_time_range(value, start, end)) {
+                input_error(line_nr, "niepoprawny przedział czasu \"" + value +
                                          "\" (oczekiwano HH:MM-HH:MM)");
             }
+
             if (start >= end) {
                 input_error(line_nr, "początek zajęć nie jest przed końcem");
             }
-            get<0>(hours[line_nr - 1]) = start;
-            get<1>(hours[line_nr - 1]) = end;
+
+            get<0>(hours[day]) = start;
+            get<1>(hours[day]) = end;
         }
-        else {
-            line = trim(line);
-            if (line == "true") {
-                free_days[line_nr - 6] = true;
+        else if (cut_suffix(key, "CzyWolne")) {
+            int day = find_name(day_names, 5, key);
+            if (day < 0) {
+                input_error(line_nr, "nieznany dzień \"" + key + "\"");
             }
-            else if (line == "false") {
-                free_days[line_nr - 6] = false;
+            value = trim(value);
+            if (value == "true") {
+                free_days[day] = true;
+            }
+            else if (value == "false") {
+                free_days[day] = false;
             }
             else {
                 input_error(line_nr, "niepoprawne dane\"");
             }
+        }
+        else {
+            input_error(line_nr, "nieznany klucz \"" + key + "\"");
         }
     }
 }
