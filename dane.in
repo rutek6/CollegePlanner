@@ -1,0 +1,55 @@
+# Przykładowe dane wejściowe dla solver.cpp
+#
+# PRZEDMIOT <nazwa>                  - nowy przedmiot
+#   ZAJECIA <WYK|CW|LAB|CWW|WF|SEM|OTHER> - pod-przedmiot ostatniego przedmiotu
+#     GRUPA <nr>                     - grupa ostatnich zajęć
+#       <Pn|Wt|Sr|Cz|Pt|So|Nd> HH:MM-HH:MM - termin ostatniej grupy
+#
+# Wcięcia są opcjonalne, '#' zaczyna komentarz.
+
+PRZEDMIOT Analiza matematyczna 2
+  ZAJECIA WYK
+    GRUPA 1
+      Pn 08:15-10:00
+      Sr 08:15-10:00
+  ZAJECIA CW
+    GRUPA 1
+      Wt 10:15-12:00
+    GRUPA 2
+      Cz 12:15-14:00
+    GRUPA 3
+      Pt 08:15-10:00
+
+PRZEDMIOT Algorytmy i struktury danych
+  ZAJECIA WYK
+    GRUPA 1
+      Wt 08:15-10:00
+  ZAJECIA LAB
+    GRUPA 1
+      Wt 10:15-12:00   # koliduje z ćwiczeniami z analizy, gr. 1
+    GRUPA 2
+      Sr 12:15-14:00
+    GRUPA 3
+      Cz 12:15-14:00   # koliduje z ćwiczeniami z analizy, gr. 2
+
+PRZEDMIOT Fizyka 1
+  ZAJECIA WYK
+    GRUPA 1
+      Pn 10:15-12:00
+  ZAJECIA CW
+    GRUPA 1
+      Sr 12:15-14:00
+    GRUPA 2
+      Pt 08:15-10:00
+  ZAJECIA LAB
+    GRUPA 1
+      Cz 14:15-17:00
+    GRUPA 2
+      Pt 10:15-13:00
+
+PRZEDMIOT Wychowanie fizyczne
+  ZAJECIA WF
+    GRUPA 1
+      Pn 16:15-17:45
+    GRUPA 2
+      Cz 16:15-17:45
