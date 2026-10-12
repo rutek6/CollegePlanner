@@ -1,6 +1,7 @@
 #include "input_text.h"
 
 #include "preferences.h"
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
@@ -28,6 +29,14 @@ string trim(const string &s) {
 int find_name(const char *names[], int count, const string &name) {
     for (int i = 0; i < count; i++) {
         if (name == names[i]) {
+            return i;
+        }
+        string day_lower = names[i];
+        transform(day_lower.begin(),
+                  day_lower.end(),
+                  day_lower.begin(),
+                  [](unsigned char c) { return tolower(c); });
+        if (name == day_lower) {
             return i;
         }
     }
@@ -120,8 +129,9 @@ catalog read_catalog(istream &in) {
             slot s;
             s.day = find_name(day_names, day_count, keyword);
             if (!parse_time_range(rest, s.start, s.end)) {
-                input_error(line_nr, "niepoprawny przedział czasu \"" + rest +
-                                         "\" (oczekiwano HH:MM-HH:MM)");
+                input_error(line_nr,
+                            "niepoprawny przedział czasu \"" + rest +
+                                "\" (oczekiwano HH:MM-HH:MM)");
             }
             if (s.start >= s.end) {
                 input_error(line_nr, "początek zajęć nie jest przed końcem");
@@ -272,8 +282,11 @@ void read_prefs(prefs &preferences,
         if (key.empty()) {
             continue;
         }
+        transform(key.begin(), key.end(), key.begin(), [](unsigned char c) {
+            return tolower(c);
+        });
 
-        if (cut_suffix(key, "Godziny")) {
+        if (cut_suffix(key, "godziny")) {
             int day = find_name(day_names, 5, key);
 
             if (day < 0) {
@@ -282,8 +295,9 @@ void read_prefs(prefs &preferences,
 
             int start, end;
             if (!parse_time_range(value, start, end)) {
-                input_error(line_nr, "niepoprawny przedział czasu \"" + value +
-                                         "\" (oczekiwano HH:MM-HH:MM)");
+                input_error(line_nr,
+                            "niepoprawny przedział czasu \"" + value +
+                                "\" (oczekiwano HH:MM-HH:MM)");
             }
 
             if (start >= end) {
@@ -293,7 +307,7 @@ void read_prefs(prefs &preferences,
             get<0>(preferences.hours[day]) = start;
             get<1>(preferences.hours[day]) = end;
         }
-        else if (cut_suffix(key, "CzyWolne")) {
+        else if (cut_suffix(key, "czywolne")) {
             int day = find_name(day_names, 5, key);
             if (day < 0) {
                 input_error(line_nr, "nieznany dzień \"" + key + "\"");
@@ -309,7 +323,7 @@ void read_prefs(prefs &preferences,
                 input_error(line_nr, "niepoprawne dane\"");
             }
         }
-        else if (key == "Przypnij") {
+        else if (key == "przypnij") {
             int group_id = parse_group_id(value, cat, out);
             if (group_id == -1) {
                 input_error(line_nr, "nieznana grupa \"" + value + "\"");

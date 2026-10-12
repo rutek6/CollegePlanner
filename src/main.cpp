@@ -7,7 +7,6 @@
 #include "model.h"
 #include "output.h"
 #include "preferences.h"
-#include "repl.h"
 #include "solver.h"
 
 using namespace std;
