@@ -21,11 +21,37 @@ bool group_fits_prefs(const group &g, const prefs &preferences) {
     return true;
 }
 
+int time_cost(const plan &p, const catalog &cat) {
+    int total_time_spent = 0;
+    int late_end_penalty = 0;
+    for (int day = 0; day < day_count; day++) {
+        int min_start = 0, max_end = 24 * 60;
+
+        for (size_t i = 0; i < p.chosen.size(); i++) {
+            group g = cat.groups[p.chosen[i]];
+            for (slot s : g.slots) {
+                if (s.day == day) {
+                    if (s.start < min_start) {
+                        min_start = s.start;
+                    }
+                    if (s.end > max_end) {
+                        max_end = s.end;
+                    }
+                }
+            }
+        }
+        total_time_spent += max_end - min_start;
+        late_end_penalty += max_end;
+    }
+    return total_time_spent + late_end_penalty;
+}
+
 void dfs(plan current_plan,
          plan &result,
          size_t &result_conflicts,
+         int &result_time_cost,
          const vector<vector<bool>> &conflicts,
-         const vector<group> &groups,
+         const catalog &cat,
          const vector<vector<int>> &allowed,
          const prefs &preferences,
          int index,
@@ -36,7 +62,8 @@ void dfs(plan current_plan,
     // }
     if (index == end) {
         size_t nr_of_conflicts = current_plan.calculate_conflicts(conflicts);
-        if (nr_of_conflicts < result_conflicts) {
+        if (nr_of_conflicts < result_conflicts &&
+            time_cost(current_plan, cat) < result_time_cost) {
             result = current_plan;
             result.conflicts = nr_of_conflicts;
             result_conflicts = nr_of_conflicts;
@@ -45,7 +72,7 @@ void dfs(plan current_plan,
     }
 
     for (int group_id : allowed[index]) {
-        if (!group_fits_prefs(groups[group_id], preferences)) {
+        if (!group_fits_prefs(cat.groups[group_id], preferences)) {
             continue;
         }
         current_plan.chosen.push_back(group_id);
@@ -56,8 +83,8 @@ void dfs(plan current_plan,
             continue;
         }
 
-        dfs(current_plan, result, result_conflicts, conflicts, groups, allowed,
-            preferences, index + 1, end);
+        dfs(current_plan, result, result_conflicts, result_time_cost, conflicts,
+            cat, allowed, preferences, index + 1, end);
 
         current_plan.chosen.pop_back();
     }
@@ -68,7 +95,7 @@ plan generate_plans(const catalog &cat,
                     const vector<vector<bool>> &conflicts) {
     plan result;
     size_t result_conflicts = SIZE_MAX; // każdy pełny plan będzie lepszy
-
+    int result_time_cost = __INT_MAX__;
     // allowed[k] - id grup pod-przedmiotu k, które dfs rozważa: przypięte,
     // a jeśli w tym pod-przedmiocie nic nie przypięto - wszystkie.
     vector<vector<int>> allowed;
@@ -86,7 +113,7 @@ plan generate_plans(const catalog &cat,
     }
 
     plan new_plan;
-    dfs(new_plan, result, result_conflicts, conflicts, cat.groups, allowed,
-        preferences, 0, cat.sub_courses.size());
+    dfs(new_plan, result, result_conflicts, result_time_cost, conflicts, cat,
+        allowed, preferences, 0, cat.sub_courses.size());
     return result;
 }

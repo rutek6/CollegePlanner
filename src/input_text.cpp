@@ -164,6 +164,16 @@ bool cut_suffix(string &key, const string &suffix) {
     return true;
 }
 
+void cut_spaces(string &s) {
+    int new_index = 0;
+    for (int i = 0; i < static_cast<int>(s.length()); i++) {
+        if (s[i] != ' ') {
+            s[new_index++] = s[i];
+        }
+    }
+    s = s.substr(0, new_index);
+}
+
 int parse_group_id(const string &line, const catalog &cat, ostream &out) {
     istringstream input(line);
     string name, type_string;
@@ -177,11 +187,15 @@ int parse_group_id(const string &line, const catalog &cat, ostream &out) {
         course_name_candidates.insert(c.name);
     }
 
+    cut_spaces(name);
     for (size_t i = 0; i < name.length(); i++) {
         for (auto it = course_name_candidates.begin();
              it != course_name_candidates.end();) {
             string s = *it;
-            if (s.length() < name.length() || name[i] != s[i]) {
+            cut_spaces(s);
+            if (s.length() < name.length() ||
+
+                tolower(name[i]) != tolower(s[i])) {
                 it = course_name_candidates.erase(it);
             }
             else {
@@ -195,7 +209,7 @@ int parse_group_id(const string &line, const catalog &cat, ostream &out) {
         out << "brak pasujących nazw\n";
         return -1;
     case 1:
-        out << "ZNALEZIONO: " << *course_name_candidates.begin() << "\n";
+        out << "ZNALEZIONO: " << *course_name_candidates.begin();
         break;
     default:
         out << "WIELE MOŻLIWOŚCI: \n";
@@ -228,11 +242,13 @@ int parse_group_id(const string &line, const catalog &cat, ostream &out) {
         cerr << "NIE ZNALEZIONO TYPU" << endl;
         return -1;
     }
+    cout << " " << type_names[selected_sub_course.class_type];
 
     int group_number = static_cast<int>(nr);
     group selected_group;
     for (int id : selected_sub_course.group_ids) {
         if (cat.groups[id].nr == group_number) {
+            cout << " gr. " << group_number << "\n";
             return id;
         }
     }

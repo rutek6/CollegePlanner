@@ -4,7 +4,6 @@
 /.fuse_hidden00011faf00000014
 /.vscode
 /build
-/claude_session.txt
 /dane_duze.in
 /out1.txt
 /plan.txt
@@ -12,3 +11,4 @@
 /sem3.in
 /solver
 /prefs.in
+*.txt
