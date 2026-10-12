@@ -8,6 +8,7 @@
 #include "output.h"
 #include "preferences.h"
 #include "solver.h"
+#include "tui.h"
 
 using namespace std;
 
@@ -34,5 +35,6 @@ int main(int argc, char *argv[]) {
     }
     vector<vector<bool>> conflicts = create_conflict_graph(cat);
     plan best = generate_plans(cat, preferences, conflicts);
-    print_plan(best, cat, cout);
+    // print_plan(best, cat, cout);
+    run_tui(cat, best);
 }
