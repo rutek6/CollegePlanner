@@ -1,7 +1,12 @@
 #include "tui.h"
 
 #include <algorithm>
+#include <deque>
+#include <fstream>
+#include <functional>
+#include <memory>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <ftxui/component/app.hpp>
@@ -9,7 +14,11 @@
 #include <ftxui/dom/elements.hpp>
 #include <ftxui/screen/terminal.hpp>
 
+#include "conflict.h"
+#include "input_text.h"
+#include "input_usos.h"
 #include "output.h"
+#include "solver.h"
 
 using namespace std;
 using namespace ftxui;
@@ -282,36 +291,479 @@ Element legend(const plan &p, const catalog &cat) {
     return hbox(chips);
 }
 
-void run_tui(const catalog &cat, const plan &p) {
+// ---------------------------------------------------------------------------
+// Panel preferencji
+// ---------------------------------------------------------------------------
+
+// Preferencje w postaci, którą edytują komponenty FTXUI: Checkbox potrzebuje
+// bool*, Input - string. Zmiany trafiają do prefs dopiero po zapisie.
+struct prefs_editor {
+    bool free_days[5];
+    string start[5]; // "HH:MM"
+    string end[5];
+    deque<bool> pinned; // pinned[id grupy]; deque nie przenosi elementów,
+                        // więc wskaźniki dane Checkboxom zostają ważne
+    string path;        // plik, do którego zapisujemy
+    string error;       // komunikat błędu pod przyciskami
+};
+
+void load_editor(prefs_editor &editor, const prefs &preferences) {
+    for (int day = 0; day < 5; day++) {
+        editor.free_days[day] = preferences.free_days[day];
+        editor.start[day] = format_time(get<0>(preferences.hours[day]));
+        editor.end[day] = format_time(get<1>(preferences.hours[day]));
+    }
+    for (size_t id = 0; id < editor.pinned.size(); id++) {
+        editor.pinned[id] = false;
+    }
+    for (int group_id : preferences.required_group_ids) {
+        editor.pinned[group_id] = true;
+    }
+    editor.error.clear();
+}
+
+// Przepisuje stan edytora do result. Przy błędnej godzinie zwraca false
+// i ustawia editor.error.
+bool editor_to_prefs(prefs_editor &editor, prefs &result) {
+    for (int day = 0; day < 5; day++) {
+        int start, end;
+        if (!parse_time_range(editor.start[day] + "-" + editor.end[day], start,
+                              end)) {
+            editor.error = string(day_names[day]) +
+                           ": niepoprawna godzina (oczekiwano HH:MM)";
+            return false;
+        }
+        if (start >= end) {
+            editor.error = string(day_names[day]) +
+                           ": początek musi być przed końcem";
+            return false;
+        }
+        result.hours[day] = make_tuple(start, end);
+        result.free_days[day] = editor.free_days[day];
+    }
+    result.required_group_ids.clear();
+    for (size_t id = 0; id < editor.pinned.size(); id++) {
+        if (editor.pinned[id]) {
+            result.required_group_ids.push_back(id);
+        }
+    }
+    return true;
+}
+
+// "5 (Pn 12:15, Cz 10:15)" - numer grupy i początki jej zajęć.
+string group_label(const group &g) {
+    string label = to_string(g.nr) + " (";
+    for (size_t i = 0; i < g.slots.size(); i++) {
+        if (i > 0) {
+            label += ", ";
+        }
+        label += string(day_names[g.slots[i].day]) + " " +
+                 format_time(g.slots[i].start);
+    }
+    return label + ")";
+}
+
+Component time_input(string *content) {
+    InputOption option;
+    option.multiline = false;
+    Component input = Input(content, "HH:MM", option);
+    return Renderer(input, [input] {
+        return hbox({text("["), input->Render() | size(WIDTH, EQUAL, 5),
+                     text("]")});
+    });
+}
+
+Component build_prefs_panel(prefs_editor &editor,
+                            const catalog &cat,
+                            function<void()> on_save,
+                            function<void()> on_cancel) {
+    // Dni: wolny dzień i zakres godzin, w którym mogą być zajęcia.
+    Components day_rows;
+    for (int day = 0; day < 5; day++) {
+        Component free_day = Checkbox("wolny", &editor.free_days[day]);
+        Component start = time_input(&editor.start[day]);
+        Component end = time_input(&editor.end[day]);
+        Component row = Container::Horizontal({free_day, start, end});
+        day_rows.push_back(Renderer(row, [=] {
+            return hbox({text(string(" ") + day_names[day]) |
+                             size(WIDTH, EQUAL, 4),
+                         free_day->Render(), text("   od "), start->Render(),
+                         text(" do "), end->Render()});
+        }));
+    }
+    Component days = Container::Vertical(day_rows);
+
+    // Przypięcia: dla każdych zajęć pola wyboru przy wszystkich grupach.
+    // W kontenerze są tylko wiersze z polami (nagłówki przedmiotów nie mogą
+    // dostawać fokusu), nagłówki dorysowujemy przy renderowaniu.
+    Components pin_rows;
+    vector<string> header_before; // nazwa przedmiotu przed wierszem albo ""
+    for (const course &c : cat.courses) {
+        for (int sub_id : c.sub_ids) {
+            const sub_course &sub = cat.sub_courses[sub_id];
+            Components boxes;
+            for (int group_id : sub.group_ids) {
+                boxes.push_back(Checkbox(group_label(cat.groups[group_id]),
+                                         &editor.pinned[group_id]));
+            }
+            Component row = Container::Horizontal(boxes);
+            string type_label = string("   ") + type_names[sub.class_type];
+            pin_rows.push_back(Renderer(row, [=] {
+                Elements rendered;
+                for (const Component &box : boxes) {
+                    rendered.push_back(hbox({box->Render(), text("  ")}));
+                }
+                return hbox({text(type_label) | size(WIDTH, EQUAL, 9),
+                             hflow(rendered) | flex});
+            }));
+            header_before.push_back(sub_id == c.sub_ids.front() ? c.name : "");
+        }
+    }
+    Component pins_container = Container::Vertical(pin_rows);
+    Component pins = Renderer(pins_container, [=] {
+        Elements lines;
+        for (size_t i = 0; i < pin_rows.size(); i++) {
+            if (!header_before[i].empty()) {
+                lines.push_back(text(" " + header_before[i]) | bold);
+            }
+            lines.push_back(pin_rows[i]->Render());
+        }
+        return vbox(lines);
+    });
+
+    InputOption path_option;
+    path_option.multiline = false;
+    Component path = Input(&editor.path, "plik.in", path_option);
+    Component save = Button(" Zapisz i przelicz ", on_save);
+    Component cancel = Button(" Anuluj ", on_cancel);
+    Component buttons = Container::Horizontal({save, cancel});
+
+    Component panel = Container::Vertical({days, pins, path, buttons});
+    return Renderer(panel, [=, &editor] {
+        return vbox({
+            text(" Dni (zajęcia muszą się mieścić w podanych godzinach)") |
+                bold,
+            days->Render(),
+            separator(),
+            text(" Przypięte grupy - w zajęciach z zaznaczeniem solver wybiera "
+                 "tylko spośród zaznaczonych") |
+                bold,
+            pins->Render() | vscroll_indicator | yframe | flex,
+            separator(),
+            hbox({text(" Plik: "), path->Render() | flex}),
+            hbox({text(" "), save->Render(), text(" "), cancel->Render(),
+                  text("  "), text(editor.error) | color(Color::Red) | bold}),
+        });
+    });
+}
+
+// ---------------------------------------------------------------------------
+// Przenoszenie przypięć między danymi
+// ---------------------------------------------------------------------------
+
+// Grupa opisana tak, jak widzi ją użytkownik - po wczytaniu nowego pliku
+// id grup są inne, ale nazwa przedmiotu, typ i numer zostają.
+struct group_key {
+    string course_name;
+    type class_type;
+    int nr;
+};
+
+vector<group_key> keys_of(const catalog &cat, const vector<int> &group_ids) {
+    vector<group_key> keys;
+    for (int group_id : group_ids) {
+        const group &g = cat.groups[group_id];
+        const sub_course &sub = cat.sub_courses[g.sub_id];
+        keys.push_back({cat.courses[sub.course_id].name, sub.class_type, g.nr});
+    }
+    return keys;
+}
+
+// id grup z keys w cat; grup, których nie ma, po prostu brak w wyniku.
+vector<int> ids_of(const catalog &cat, const vector<group_key> &keys) {
+    vector<int> ids;
+    for (const group_key &key : keys) {
+        for (size_t id = 0; id < cat.groups.size(); id++) {
+            const group &g = cat.groups[id];
+            const sub_course &sub = cat.sub_courses[g.sub_id];
+            if (g.nr == key.nr && sub.class_type == key.class_type &&
+                cat.courses[sub.course_id].name == key.course_name) {
+                ids.push_back(id);
+                break;
+            }
+        }
+    }
+    return ids;
+}
+
+// ---------------------------------------------------------------------------
+
+void run_tui(string data_path,
+             catalog cat,
+             vector<vector<bool>> conflicts,
+             prefs &preferences,
+             vector<plan> plans,
+             const string &prefs_path) {
     App app = App::Fullscreen();
 
+    const plan no_plan; // pusty plan - week_grid pokaże komunikat
+    int current = 0;    // numer oglądanego planu (od 0)
+    int mode = 0;       // 0 - plan, 1 - panel preferencji, 2 - otwieranie pliku
+    string status;      // komunikat w nagłówku, np. po zapisie
+
+    // Edytor i panel preferencji zależą od danych (pola przy grupach), więc
+    // po wczytaniu nowego pliku budujemy je od nowa - stąd unique_ptr.
+    auto editor = make_unique<prefs_editor>();
+    editor->pinned.resize(cat.groups.size());
+    editor->path = prefs_path;
+
+    string open_path = data_path; // pole w oknie "Otwórz plik"
+    string open_error;
+
+    // Obliczenia (przeliczanie planów, wczytywanie pliku) robi osobny wątek,
+    // żeby ekran mógł w tym czasie pokazać komunikat. Wynik wraca przez
+    // app.Post - zadanie wykonuje się w wątku interfejsu, więc tylko on
+    // zmienia cat, conflicts i plans. Póki computing == true, nowych obliczeń
+    // nie zaczynamy, więc wątek bezpiecznie czyta cat i conflicts.
+    thread worker;
+    bool computing = false;
+    auto start_worker = [&](function<void()> task) {
+        computing = true;
+        if (worker.joinable()) {
+            worker.join(); // poprzedni wątek już skończył (computing == false)
+        }
+        worker = thread([&app, task] {
+            task();
+            app.PostEvent(Event::Custom); // samo Post nie odświeża ekranu
+        });
+    };
+
+    auto close_panel = [&] { mode = 0; };
+    auto save = [&] {
+        if (computing) {
+            editor->error = "poprzednie obliczenia jeszcze trwają";
+            return;
+        }
+        prefs updated = preferences;
+        if (!editor_to_prefs(*editor, updated)) {
+            return;
+        }
+        ofstream file(editor->path);
+        if (!file) {
+            editor->error = "nie można zapisać pliku \"" + editor->path + "\"";
+            return;
+        }
+        write_prefs(updated, cat, file);
+        file.close();
+
+        preferences = updated;
+        mode = 0;
+        status = "przeliczanie...";
+        start_worker([&, updated, path = editor->path] {
+            vector<plan> result = generate_plans(cat, updated, conflicts);
+            app.Post([&, result, path] {
+                plans = result;
+                current = 0;
+                status = "zapisano w " + path;
+                computing = false;
+            });
+        });
+    };
+
+    Component panel_slot = Container::Vertical({});
+    auto rebuild_panel = [&] {
+        string path = editor->path;
+        panel_slot->DetachAllChildren(); // najpierw komponenty, potem edytor
+        editor = make_unique<prefs_editor>();
+        editor->pinned.resize(cat.groups.size());
+        editor->path = path;
+        panel_slot->Add(build_prefs_panel(*editor, cat, save, close_panel));
+    };
+    rebuild_panel();
+
+    auto open_file = [&] {
+        if (computing) {
+            open_error = "poprzednie obliczenia jeszcze trwają";
+            return;
+        }
+        mode = 0;
+        status = "wczytywanie " + open_path + "...";
+        prefs base = preferences;
+        vector<group_key> pinned = keys_of(cat, preferences.required_group_ids);
+        start_worker([&, base, pinned, path = open_path]() mutable {
+            try {
+                string warnings;
+                catalog new_cat = load_catalog(path, warnings);
+                base.required_group_ids = ids_of(new_cat, pinned);
+                vector<vector<bool>> new_conflicts = create_conflict_graph(new_cat);
+                vector<plan> new_plans =
+                    generate_plans(new_cat, base, new_conflicts);
+                int warning_count = count(warnings.begin(), warnings.end(), '\n');
+                int lost_pins = pinned.size() - base.required_group_ids.size();
+                app.Post([&, new_cat, new_conflicts, new_plans, base, path,
+                          warning_count, lost_pins] {
+                    cat = new_cat;
+                    conflicts = new_conflicts;
+                    plans = new_plans;
+                    preferences = base;
+                    current = 0;
+                    data_path = path;
+                    mode = 0;
+                    rebuild_panel();
+                    status = "wczytano " + path;
+                    if (warning_count > 0) {
+                        status += ", ostrzeżenia parsera: " +
+                                  to_string(warning_count);
+                    }
+                    if (lost_pins > 0) {
+                        status += ", odpięte grupy (brak w danych): " +
+                                  to_string(lost_pins);
+                    }
+                    computing = false;
+                });
+            } catch (const input_exception &e) {
+                string message = e.what();
+                app.Post([&, message] {
+                    status = message;
+                    computing = false;
+                });
+            }
+        });
+    };
+
     // Renderer jest wywoływany przy każdym odświeżeniu ekranu (także po
-    // zmianie rozmiaru terminala), więc siatka dopasowuje się do okna.
-    Component view = Renderer([&] {
-        Element conflicts = text("Konflikty: " + to_string(p.conflicts) + " ");
+    // zmianie rozmiaru terminala i po przełączeniu planu), więc rysuje zawsze
+    // aktualny plan dopasowany do okna.
+    Component plan_view = Renderer([&] {
+        int plan_count = plans.size();
+        const plan &p = plan_count > 0 ? plans[current] : no_plan;
+
+        Element conflicts_info =
+            text("Konflikty: " + to_string(p.conflicts) + " ");
         if (p.chosen.empty()) {
-            conflicts = text(""); // brak planu - liczba nic nie znaczy
+            conflicts_info = text(""); // brak planu - liczba nic nie znaczy
         }
         else if (p.conflicts > 0) {
-            conflicts = conflicts | color(Color::Red) | bold;
+            conflicts_info = conflicts_info | color(Color::Red) | bold;
         }
+
+        Element plan_number = text("");
+        string keys = " o - otwórz plik   p - preferencje   q - wyjście";
+        if (plan_count > 1) {
+            plan_number = text("Plan " + to_string(current + 1) + "/" +
+                               to_string(plan_count)) |
+                          bold;
+            keys = " ←/→ - plany   Home/End - pierwszy/ostatni   o - otwórz plik"
+                   "   p - preferencje   q - wyjście";
+        }
+
         return vbox({
-                   hbox({text(" CollegePlanner") | bold, filler(), conflicts}),
+                   hbox({text(" CollegePlanner") | bold,
+                         text(" - " + data_path),
+                         text(status.empty() ? "" : "  (" + status + ")") | dim,
+                         filler(), plan_number, filler(), conflicts_info}),
                    separator(),
                    week_grid(p, cat) | flex,
                    separator(),
-                   hbox({text(" q - wyjście") | dim, filler(), legend(p, cat)}),
+                   hbox({text(keys) | dim, filler(), legend(p, cat)}),
                }) |
                border;
     });
 
-    view |= CatchEvent([&](Event event) {
+    Component prefs_view = Renderer(panel_slot, [&] {
+        return vbox({
+                   hbox({text(" CollegePlanner - preferencje") | bold,
+                         filler(),
+                         text("strzałki - poruszanie   Spacja/Enter - "
+                              "zaznacz   Esc - anuluj ") |
+                             dim}),
+                   separator(),
+                   panel_slot->Render() | flex,
+               }) |
+               border;
+    });
+
+    InputOption open_option;
+    open_option.multiline = false;
+    open_option.on_enter = open_file;
+    Component open_input = Input(&open_path, "plan.html albo dane.in", open_option);
+    Component open_button = Button(" Wczytaj ", open_file);
+    Component open_cancel = Button(" Anuluj ", close_panel);
+    Component open_form = Container::Vertical(
+        {open_input, Container::Horizontal({open_button, open_cancel})});
+    Component open_view = Renderer(open_form, [&] {
+        return vbox({
+                   hbox({text(" CollegePlanner - otwórz plik") | bold, filler(),
+                         text("Enter - wczytaj   Esc - anuluj ") | dim}),
+                   separator(),
+                   text(" Plan z USOSweb (.html) przejdzie przez parser "
+                        "src/usos_to_in.py; inne pliki są czytane jako .in."),
+                   text(" Przypięte grupy zostaną przeniesione, jeśli są w "
+                        "nowych danych."),
+                   text(""),
+                   hbox({text(" Plik: "), open_input->Render() | flex}),
+                   text(""),
+                   hbox({text(" "), open_button->Render(), text(" "),
+                         open_cancel->Render(), text("  "),
+                         text(open_error) | color(Color::Red) | bold}),
+                   filler(),
+               }) |
+               border;
+    });
+
+    Component root =
+        Container::Tab({plan_view, prefs_view, open_view}, &mode);
+    root |= CatchEvent([&](Event event) {
+        if (mode != 0) {
+            // W panelach klawisze trafiają do pól (np. 'q' w nazwie pliku);
+            // przechwytujemy tylko Esc.
+            if (event == Event::Escape) {
+                close_panel();
+                return true;
+            }
+            return false;
+        }
         if (event == Event::Character('q') || event == Event::Escape) {
             app.Exit();
+            return true;
+        }
+        if (event == Event::Character('p')) {
+            load_editor(*editor, preferences);
+            mode = 1;
+            return true;
+        }
+        if (event == Event::Character('o')) {
+            open_error.clear();
+            mode = 2;
+            return true;
+        }
+        int plan_count = plans.size();
+        if (plan_count == 0) {
+            return false;
+        }
+        // Strzałki przechodzą w kółko: za ostatnim planem jest pierwszy.
+        if (event == Event::ArrowRight || event == Event::Character('l')) {
+            current = (current + 1) % plan_count;
+            return true;
+        }
+        if (event == Event::ArrowLeft || event == Event::Character('h')) {
+            current = (current - 1 + plan_count) % plan_count;
+            return true;
+        }
+        if (event == Event::Home) {
+            current = 0;
+            return true;
+        }
+        if (event == Event::End) {
+            current = plan_count - 1;
             return true;
         }
         return false;
     });
 
-    app.Loop(view);
+    app.Loop(root);
+    // Wątek korzysta z cat i conflicts - musi skończyć, zanim znikną.
+    if (worker.joinable()) {
+        worker.join();
+    }
 }

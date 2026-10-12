@@ -25,11 +25,11 @@ int time_cost(const plan &p, const catalog &cat) {
     int total_time_spent = 0;
     int late_end_penalty = 0;
     for (int day = 0; day < day_count; day++) {
-        int min_start = 0, max_end = 24 * 60;
+        int min_start = 24 * 60, max_end = 0;
 
         for (size_t i = 0; i < p.chosen.size(); i++) {
-            group g = cat.groups[p.chosen[i]];
-            for (slot s : g.slots) {
+            const group &g = cat.groups[p.chosen[i]];
+            for (const slot &s : g.slots) {
                 if (s.day == day) {
                     if (s.start < min_start) {
                         min_start = s.start;
@@ -40,6 +40,9 @@ int time_cost(const plan &p, const catalog &cat) {
                 }
             }
         }
+        if (max_end <= min_start) {
+            continue; // dzień bez zajęć nic nie kosztuje
+        }
         total_time_spent += max_end - min_start;
         late_end_penalty += max_end;
     }
@@ -47,7 +50,7 @@ int time_cost(const plan &p, const catalog &cat) {
 }
 
 void dfs(plan current_plan,
-         plan &result,
+         vector<plan> &contenders,
          size_t &result_conflicts,
          int &result_time_cost,
          const vector<vector<bool>> &conflicts,
@@ -62,11 +65,19 @@ void dfs(plan current_plan,
     // }
     if (index == end) {
         size_t nr_of_conflicts = current_plan.calculate_conflicts(conflicts);
-        if (nr_of_conflicts < result_conflicts &&
-            time_cost(current_plan, cat) < result_time_cost) {
-            result = current_plan;
-            result.conflicts = nr_of_conflicts;
+        int current_time_cost = time_cost(current_plan, cat);
+        current_plan.conflicts = nr_of_conflicts;
+        if (nr_of_conflicts < result_conflicts ||
+            (current_time_cost < result_time_cost &&
+             nr_of_conflicts == result_conflicts)) {
+            result_time_cost = current_time_cost;
             result_conflicts = nr_of_conflicts;
+            contenders.clear();
+            contenders.push_back(current_plan);
+        }
+        else if (nr_of_conflicts == result_conflicts &&
+                 current_time_cost == result_time_cost) {
+            contenders.push_back(current_plan);
         }
         return;
     }
@@ -78,22 +89,30 @@ void dfs(plan current_plan,
         current_plan.chosen.push_back(group_id);
         size_t current_conflicts = current_plan.calculate_conflicts(conflicts);
 
-        if (current_conflicts >= result_conflicts) {
+        if (current_conflicts > result_conflicts) {
             current_plan.chosen.pop_back();
             continue;
         }
 
-        dfs(current_plan, result, result_conflicts, result_time_cost, conflicts,
-            cat, allowed, preferences, index + 1, end);
+        dfs(current_plan,
+            contenders,
+            result_conflicts,
+            result_time_cost,
+            conflicts,
+            cat,
+            allowed,
+            preferences,
+            index + 1,
+            end);
 
         current_plan.chosen.pop_back();
     }
 }
 
-plan generate_plans(const catalog &cat,
-                    prefs preferences,
-                    const vector<vector<bool>> &conflicts) {
-    plan result;
+vector<plan> generate_plans(const catalog &cat,
+                            prefs preferences,
+                            const vector<vector<bool>> &conflicts) {
+    vector<plan> contenders; // wszystkie równoważne najlepsze plany
     size_t result_conflicts = SIZE_MAX; // każdy pełny plan będzie lepszy
     int result_time_cost = __INT_MAX__;
     // allowed[k] - id grup pod-przedmiotu k, które dfs rozważa: przypięte,
@@ -113,7 +132,15 @@ plan generate_plans(const catalog &cat,
     }
 
     plan new_plan;
-    dfs(new_plan, result, result_conflicts, result_time_cost, conflicts, cat,
-        allowed, preferences, 0, cat.sub_courses.size());
-    return result;
+    dfs(new_plan,
+        contenders,
+        result_conflicts,
+        result_time_cost,
+        conflicts,
+        cat,
+        allowed,
+        preferences,
+        0,
+        cat.sub_courses.size());
+    return contenders;
 }

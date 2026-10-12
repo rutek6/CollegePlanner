@@ -7,8 +7,9 @@
 /dane_duze.in
 /out1.txt
 /plan.txt
-/sem3.html
 /sem3.in
 /solver
 /prefs.in
 *.txt
+__pycache__/
+*.html

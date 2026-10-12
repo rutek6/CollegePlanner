@@ -1,5 +1,6 @@
 #include "input_text.h"
 
+#include "output.h"
 #include "preferences.h"
 #include <algorithm>
 #include <cstdio>
@@ -11,10 +12,11 @@
 
 using namespace std;
 
+// Błędy danych zgłaszamy wyjątkiem (input_exception, input_text.h): main
+// wypisuje komunikat i kończy program, a TUI pokazuje go w nagłówku.
 [[noreturn]] void input_error(int line_nr, const string &message) {
-    cerr << "Błąd danych wejściowych (linia " << line_nr << "): " << message
-         << '\n';
-    exit(1);
+    throw input_exception("Błąd danych wejściowych (linia " +
+                          to_string(line_nr) + "): " + message);
 }
 
 string trim(const string &s) {
@@ -146,17 +148,16 @@ catalog read_catalog(istream &in) {
     // Przedmiot bez zajęć albo zajęcia bez grup uniemożliwiają ułożenie planu.
     for (const course &c : cat.courses) {
         if (c.sub_ids.empty()) {
-            cerr << "Błąd danych wejściowych: przedmiot \"" << c.name
-                 << "\" nie ma żadnych ZAJEC\n";
-            exit(1);
+            throw input_exception("Błąd danych wejściowych: przedmiot \"" +
+                                  c.name + "\" nie ma żadnych ZAJEC");
         }
         for (int sub_id : c.sub_ids) {
             const sub_course &sub = cat.sub_courses[sub_id];
             if (sub.group_ids.empty()) {
-                cerr << "Błąd danych wejściowych: zajęcia "
-                     << type_names[sub.class_type] << " przedmiotu \"" << c.name
-                     << "\" nie mają żadnej GRUPY\n";
-                exit(1);
+                throw input_exception(string("Błąd danych wejściowych: zajęcia ") +
+                                      type_names[sub.class_type] +
+                                      " przedmiotu \"" + c.name +
+                                      "\" nie mają żadnej GRUPY");
             }
         }
     }
@@ -333,5 +334,33 @@ void read_prefs(prefs &preferences,
         else {
             input_error(line_nr, "nieznany klucz \"" + key + "\"");
         }
+    }
+}
+
+void write_prefs(const prefs &preferences,
+                 const catalog &cat,
+                 std::ostream &out) {
+    for (int day = 0; day < 5; day++) {
+        out << day_names[day] << "Godziny "
+            << format_time(get<0>(preferences.hours[day])) << '-'
+            << format_time(get<1>(preferences.hours[day])) << '\n';
+    }
+    out << '\n';
+    for (int day = 0; day < 5; day++) {
+        out << day_names[day] << "CzyWolne "
+            << (preferences.free_days[day] ? "true" : "false") << '\n';
+    }
+    if (!preferences.required_group_ids.empty()) {
+        out << '\n';
+    }
+    for (int group_id : preferences.required_group_ids) {
+        const group &g = cat.groups[group_id];
+        const sub_course &sub = cat.sub_courses[g.sub_id];
+        // parse_group_id porównuje nazwy bez spacji, więc pełna nazwa bez
+        // spacji wskazuje przedmiot.
+        string name = cat.courses[sub.course_id].name;
+        cut_spaces(name);
+        out << "Przypnij " << name << ' ' << type_names[sub.class_type] << ' '
+            << g.nr << '\n';
     }
 }
