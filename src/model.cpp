@@ -32,12 +32,26 @@ bool group::is_conflict(group second) const {
     return false;
 }
 
-size_t
-plan::calculate_conflicts(const std::vector<std::vector<bool>> &conflicts) {
+size_t plan::calculate_conflicts(
+    const std::vector<std::vector<CONFLICT_TYPE>> &conflicts) {
     size_t nr_of_conflicts = 0;
     for (size_t i = 0; i < chosen.size(); i++) {
         for (size_t j = i + 1; j < chosen.size(); j++) {
-            if (conflicts[chosen[i]][chosen[j]]) {
+            if (conflicts[chosen[i]][chosen[j]] == HARD ||
+                conflicts[chosen[i]][chosen[j]] == SOFT) {
+                nr_of_conflicts++;
+            }
+        }
+    }
+    return nr_of_conflicts;
+}
+
+size_t plan::calculate_soft_conflicts(
+    const std::vector<std::vector<CONFLICT_TYPE>> &conflicts) {
+    size_t nr_of_conflicts = 0;
+    for (size_t i = 0; i < chosen.size(); i++) {
+        for (size_t j = i + 1; j < chosen.size(); j++) {
+            if (conflicts[chosen[i]][chosen[j]] == SOFT) {
                 nr_of_conflicts++;
             }
         }

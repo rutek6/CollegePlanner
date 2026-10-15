@@ -1,5 +1,6 @@
 #include "solver.h"
 
+#include "conflict.h"
 #include "preferences.h"
 #include <algorithm>
 #include <cstdint>
@@ -52,8 +53,9 @@ int time_cost(const plan &p, const catalog &cat) {
 void dfs(plan current_plan,
          vector<plan> &contenders,
          size_t &result_conflicts,
+         size_t &result_soft_conflicts,
          int &result_time_cost,
-         const vector<vector<bool>> &conflicts,
+         const vector<vector<CONFLICT_TYPE>> &conflicts,
          const catalog &cat,
          const vector<vector<int>> &allowed,
          const prefs &preferences,
@@ -70,6 +72,7 @@ void dfs(plan current_plan,
         if (nr_of_conflicts < result_conflicts ||
             (current_time_cost < result_time_cost &&
              nr_of_conflicts == result_conflicts)) {
+
             result_time_cost = current_time_cost;
             result_conflicts = nr_of_conflicts;
             contenders.clear();
@@ -97,6 +100,7 @@ void dfs(plan current_plan,
         dfs(current_plan,
             contenders,
             result_conflicts,
+            result_soft_conflicts,
             result_time_cost,
             conflicts,
             cat,
@@ -111,9 +115,10 @@ void dfs(plan current_plan,
 
 vector<plan> generate_plans(const catalog &cat,
                             prefs preferences,
-                            const vector<vector<bool>> &conflicts) {
-    vector<plan> contenders; // wszystkie równoważne najlepsze plany
+                            const vector<vector<CONFLICT_TYPE>> &conflicts) {
+    vector<plan> contenders;            // wszystkie równoważne najlepsze plany
     size_t result_conflicts = SIZE_MAX; // każdy pełny plan będzie lepszy
+    size_t result_soft_conflicts = SIZE_MAX;
     int result_time_cost = __INT_MAX__;
     // allowed[k] - id grup pod-przedmiotu k, które dfs rozważa: przypięte,
     // a jeśli w tym pod-przedmiocie nic nie przypięto - wszystkie.
@@ -135,6 +140,7 @@ vector<plan> generate_plans(const catalog &cat,
     dfs(new_plan,
         contenders,
         result_conflicts,
+        result_soft_conflicts,
         result_time_cost,
         conflicts,
         cat,

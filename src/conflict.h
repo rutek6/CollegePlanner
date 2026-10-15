@@ -6,4 +6,5 @@
 
 #include "model.h"
 
-std::vector<std::vector<bool>> create_conflict_graph(const catalog &cat);
+std::vector<std::vector<CONFLICT_TYPE>>
+create_conflict_graph(const catalog &cat);

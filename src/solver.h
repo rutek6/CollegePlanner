@@ -13,4 +13,4 @@
 // jakąś grupę, rozważane są tylko wybrane grupy.
 vector<plan> generate_plans(const catalog &cat,
                             prefs preferences,
-                            const vector<vector<bool>> &conflicts);
+                            const vector<vector<CONFLICT_TYPE>> &conflicts);

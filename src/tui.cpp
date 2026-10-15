@@ -84,9 +84,8 @@ Element class_block(const grid_entry &e, const catalog &cat, int height) {
         content.push_back(text(lines[i]));
     }
 
-    Color background = e.conflict
-                           ? conflict_color
-                           : type_colors[sub.class_type];
+    Color background =
+        e.conflict ? conflict_color : type_colors[sub.class_type];
     Element block = vbox(content) | size(HEIGHT, EQUAL, height) |
                     bgcolor(background) | color(Color::White);
     if (e.conflict) {
@@ -106,7 +105,8 @@ Element day_column(int day,
                    int rows,
                    int minutes_per_row,
                    int width) {
-    sort(entries.begin(), entries.end(),
+    sort(entries.begin(),
+         entries.end(),
          [](const grid_entry &a, const grid_entry &b) {
              return a.s.start < b.s.start;
          });
@@ -150,8 +150,9 @@ Element day_column(int day,
         vector<int> lane_row(lanes.size(), begin_row);
         for (size_t l = 0; l < lanes.size(); l++) {
             for (const grid_entry &e : lanes[l]) {
-                int start = max(to_row(e.s.start, first_minute, minutes_per_row),
-                                lane_row[l]);
+                int start =
+                    max(to_row(e.s.start, first_minute, minutes_per_row),
+                        lane_row[l]);
                 int end = max(to_row(e.s.end, first_minute, minutes_per_row),
                               start + 1);
                 if (start > lane_row[l]) {
@@ -174,8 +175,8 @@ Element day_column(int day,
             if (l > 0) {
                 lane_elements.push_back(text(" "));
             }
-            int lane_width =
-                lanes_width / lane_count + (l < lanes_width % lane_count ? 1 : 0);
+            int lane_width = lanes_width / lane_count +
+                             (l < lanes_width % lane_count ? 1 : 0);
             lane_elements.push_back(vbox(lane_cells[l]) |
                                     size(WIDTH, EQUAL, lane_width));
         }
@@ -204,7 +205,8 @@ Element time_axis(int first_minute, int rows, int minutes_per_row) {
     Elements cells = {text(""), separator()};
     for (int i = 0; i < rows; i++) {
         int minute = first_minute + i * minutes_per_row;
-        cells.push_back(text(minute % 60 == 0 ? format_time(minute) + " " : ""));
+        cells.push_back(
+            text(minute % 60 == 0 ? format_time(minute) + " " : ""));
     }
     return vbox(cells) | size(WIDTH, EQUAL, time_axis_width);
 }
@@ -263,8 +265,8 @@ Element week_grid(const plan &p, const catalog &cat) {
         }
         columns.push_back(separator());
         int width = day_width + (day < wider_days ? 1 : 0);
-        columns.push_back(day_column(day, day_entries, cat, first_minute, rows,
-                                     minutes_per_row, width));
+        columns.push_back(day_column(
+            day, day_entries, cat, first_minute, rows, minutes_per_row, width));
     }
     return hbox(columns);
 }
@@ -327,15 +329,15 @@ void load_editor(prefs_editor &editor, const prefs &preferences) {
 bool editor_to_prefs(prefs_editor &editor, prefs &result) {
     for (int day = 0; day < 5; day++) {
         int start, end;
-        if (!parse_time_range(editor.start[day] + "-" + editor.end[day], start,
-                              end)) {
+        if (!parse_time_range(
+                editor.start[day] + "-" + editor.end[day], start, end)) {
             editor.error = string(day_names[day]) +
                            ": niepoprawna godzina (oczekiwano HH:MM)";
             return false;
         }
         if (start >= end) {
-            editor.error = string(day_names[day]) +
-                           ": początek musi być przed końcem";
+            editor.error =
+                string(day_names[day]) + ": początek musi być przed końcem";
             return false;
         }
         result.hours[day] = make_tuple(start, end);
@@ -368,8 +370,8 @@ Component time_input(string *content) {
     option.multiline = false;
     Component input = Input(content, "HH:MM", option);
     return Renderer(input, [input] {
-        return hbox({text("["), input->Render() | size(WIDTH, EQUAL, 5),
-                     text("]")});
+        return hbox(
+            {text("["), input->Render() | size(WIDTH, EQUAL, 5), text("]")});
     });
 }
 
@@ -385,10 +387,13 @@ Component build_prefs_panel(prefs_editor &editor,
         Component end = time_input(&editor.end[day]);
         Component row = Container::Horizontal({free_day, start, end});
         day_rows.push_back(Renderer(row, [=] {
-            return hbox({text(string(" ") + day_names[day]) |
-                             size(WIDTH, EQUAL, 4),
-                         free_day->Render(), text("   od "), start->Render(),
-                         text(" do "), end->Render()});
+            return hbox(
+                {text(string(" ") + day_names[day]) | size(WIDTH, EQUAL, 4),
+                 free_day->Render(),
+                 text("   od "),
+                 start->Render(),
+                 text(" do "),
+                 end->Render()});
         }));
     }
     Component days = Container::Vertical(day_rows);
@@ -451,8 +456,12 @@ Component build_prefs_panel(prefs_editor &editor,
             pins->Render() | vscroll_indicator | yframe | flex,
             separator(),
             hbox({text(" Plik: "), path->Render() | flex}),
-            hbox({text(" "), save->Render(), text(" "), cancel->Render(),
-                  text("  "), text(editor.error) | color(Color::Red) | bold}),
+            hbox({text(" "),
+                  save->Render(),
+                  text(" "),
+                  cancel->Render(),
+                  text("  "),
+                  text(editor.error) | color(Color::Red) | bold}),
         });
     });
 }
@@ -500,7 +509,7 @@ vector<int> ids_of(const catalog &cat, const vector<group_key> &keys) {
 
 void run_tui(string data_path,
              catalog cat,
-             vector<vector<bool>> conflicts,
+             vector<vector<CONFLICT_TYPE>> conflicts,
              prefs &preferences,
              vector<plan> plans,
              const string &prefs_path) {
@@ -595,13 +604,21 @@ void run_tui(string data_path,
                 string warnings;
                 catalog new_cat = load_catalog(path, warnings);
                 base.required_group_ids = ids_of(new_cat, pinned);
-                vector<vector<bool>> new_conflicts = create_conflict_graph(new_cat);
+                vector<vector<CONFLICT_TYPE>> new_conflicts =
+                    create_conflict_graph(new_cat);
                 vector<plan> new_plans =
                     generate_plans(new_cat, base, new_conflicts);
-                int warning_count = count(warnings.begin(), warnings.end(), '\n');
+                int warning_count =
+                    count(warnings.begin(), warnings.end(), '\n');
                 int lost_pins = pinned.size() - base.required_group_ids.size();
-                app.Post([&, new_cat, new_conflicts, new_plans, base, path,
-                          warning_count, lost_pins] {
+                app.Post([&,
+                          new_cat,
+                          new_conflicts,
+                          new_plans,
+                          base,
+                          path,
+                          warning_count,
+                          lost_pins] {
                     cat = new_cat;
                     conflicts = new_conflicts;
                     plans = new_plans;
@@ -653,15 +670,19 @@ void run_tui(string data_path,
             plan_number = text("Plan " + to_string(current + 1) + "/" +
                                to_string(plan_count)) |
                           bold;
-            keys = " ←/→ - plany   Home/End - pierwszy/ostatni   o - otwórz plik"
-                   "   p - preferencje   q - wyjście";
+            keys =
+                " ←/→ - plany   Home/End - pierwszy/ostatni   o - otwórz plik"
+                "   p - preferencje   q - wyjście";
         }
 
         return vbox({
                    hbox({text(" CollegePlanner") | bold,
                          text(" - " + data_path),
                          text(status.empty() ? "" : "  (" + status + ")") | dim,
-                         filler(), plan_number, filler(), conflicts_info}),
+                         filler(),
+                         plan_number,
+                         filler(),
+                         conflicts_info}),
                    separator(),
                    week_grid(p, cat) | flex,
                    separator(),
@@ -686,14 +707,16 @@ void run_tui(string data_path,
     InputOption open_option;
     open_option.multiline = false;
     open_option.on_enter = open_file;
-    Component open_input = Input(&open_path, "plan.html albo dane.in", open_option);
+    Component open_input =
+        Input(&open_path, "plan.html albo dane.in", open_option);
     Component open_button = Button(" Wczytaj ", open_file);
     Component open_cancel = Button(" Anuluj ", close_panel);
     Component open_form = Container::Vertical(
         {open_input, Container::Horizontal({open_button, open_cancel})});
     Component open_view = Renderer(open_form, [&] {
         return vbox({
-                   hbox({text(" CollegePlanner - otwórz plik") | bold, filler(),
+                   hbox({text(" CollegePlanner - otwórz plik") | bold,
+                         filler(),
                          text("Enter - wczytaj   Esc - anuluj ") | dim}),
                    separator(),
                    text(" Plan z USOSweb (.html) przejdzie przez parser "
@@ -703,16 +726,18 @@ void run_tui(string data_path,
                    text(""),
                    hbox({text(" Plik: "), open_input->Render() | flex}),
                    text(""),
-                   hbox({text(" "), open_button->Render(), text(" "),
-                         open_cancel->Render(), text("  "),
+                   hbox({text(" "),
+                         open_button->Render(),
+                         text(" "),
+                         open_cancel->Render(),
+                         text("  "),
                          text(open_error) | color(Color::Red) | bold}),
                    filler(),
                }) |
                border;
     });
 
-    Component root =
-        Container::Tab({plan_view, prefs_view, open_view}, &mode);
+    Component root = Container::Tab({plan_view, prefs_view, open_view}, &mode);
     root |= CatchEvent([&](Event event) {
         if (mode != 0) {
             // W panelach klawisze trafiają do pól (np. 'q' w nazwie pliku);

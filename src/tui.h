@@ -17,7 +17,7 @@
 // program (klawisz 'q' albo Esc).
 void run_tui(std::string data_path,
              catalog cat,
-             std::vector<std::vector<bool>> conflicts,
+             std::vector<std::vector<CONFLICT_TYPE>> conflicts,
              prefs &preferences,
              std::vector<plan> plans,
              const std::string &prefs_path);

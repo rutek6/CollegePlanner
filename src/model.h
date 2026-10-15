@@ -6,6 +6,8 @@
 
 enum type { CW, LAB, WYK, CWW, WF, SEM, OTHER };
 
+enum CONFLICT_TYPE { NONE, HARD, SOFT };
+
 // Nazwy typów zajęć i dni tygodnia - indeksowane wartościami
 // enum type oraz slot::day. Używane przy wczytywaniu i wypisywaniu.
 extern const char *type_names[];
@@ -60,5 +62,8 @@ class plan {
     // chosen[k] = id grupy wybranej w pod-przedmiocie o id k
     std::vector<int> chosen;
     size_t conflicts = 0; // ustawiane przez solver
-    size_t calculate_conflicts(const std::vector<std::vector<bool>> &conflicts);
+    size_t calculate_conflicts(
+        const std::vector<std::vector<CONFLICT_TYPE>> &conflicts);
+    size_t calculate_soft_conflicts(
+        const std::vector<std::vector<CONFLICT_TYPE>> &conflicts);
 };

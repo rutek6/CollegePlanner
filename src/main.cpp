@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    vector<vector<bool>> conflicts = create_conflict_graph(cat);
+    vector<vector<CONFLICT_TYPE>> conflicts = create_conflict_graph(cat);
     vector<plan> best = generate_plans(cat, preferences, conflicts);
     // print_plan(best, cat, cout);
     run_tui(data_path, cat, conflicts, preferences, best, prefs_path);
