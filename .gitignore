@@ -13,3 +13,4 @@
 *.txt
 __pycache__/
 *.html
+*.in

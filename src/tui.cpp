@@ -30,20 +30,24 @@ struct grid_entry {
     bool conflict; // nakłada się z innym terminem planu
 };
 
-// Ciemne tła typów zajęć (indeksowane enum type) pod białym tekstem - każde
-// ma kontrast z bielą co najmniej 7:1. Konflikty zawsze na ciemnej czerwieni.
+// Ciemne tła typów zajęć (indeksowane enum type) w palecie Dragon karmazyn
+// (Kanagawa Dragon z karmazynowym akcentem) - ciepłe, czerwone odcienie
+// motywu, każde z kontrastem co najmniej 7:1 z block_text. Konflikty zawsze
+// na jaskrawym karmazynowym akcencie motywu.
 const Color type_colors[] = {
-    Color::RGB(0x16, 0x65, 0x34), // CW    - zielony
-    Color::RGB(0x5B, 0x21, 0xB6), // LAB   - fioletowy
-    Color::RGB(0x1E, 0x3A, 0x8A), // WYK   - granatowy
-    Color::RGB(0x11, 0x5E, 0x59), // CWW   - morski
-    Color::RGB(0x78, 0x35, 0x0F), // WF    - brązowy
-    Color::RGB(0x70, 0x1A, 0x75), // SEM   - śliwkowy
-    Color::RGB(0x33, 0x41, 0x55), // OTHER - grafitowy
+    Color::RGB(0x8B, 0x28, 0x2C), // CW    - karmazynowy
+    Color::RGB(0x78, 0x33, 0x5B), // LAB   - śliwkowy
+    Color::RGB(0x7E, 0x36, 0x24), // WYK   - rdzawy
+    Color::RGB(0x80, 0x2D, 0x4A), // CWW   - winny
+    Color::RGB(0x6E, 0x41, 0x20), // WF    - miedziany
+    Color::RGB(0x66, 0x3D, 0x66), // SEM   - wrzosowy
+    Color::RGB(0x56, 0x49, 0x47), // OTHER - ciepły szary
 };
 static_assert(sizeof(type_colors) / sizeof(type_colors[0]) == OTHER + 1,
               "każdy typ zajęć musi mieć swój kolor");
-const Color conflict_color = Color::RGB(0x99, 0x1B, 0x1B);
+const Color conflict_color = Color::RGB(0xC3, 0x40, 0x43);
+// Jasny, ciepły tekst motywu zamiast czystej bieli.
+const Color block_text = Color::RGB(0xF0, 0xE8, 0xE2);
 
 // Wiersze i kolumny zajmowane przez ramkę, nagłówek, stopkę, nazwy dni
 // i oś godzin - reszta terminala jest na siatkę.
@@ -84,10 +88,11 @@ Element class_block(const grid_entry &e, const catalog &cat, int height) {
         content.push_back(text(lines[i]));
     }
 
-    Color background =
-        e.conflict ? conflict_color : type_colors[sub.class_type];
+    // Color background =
+    //   e.conflict ? conflict_color : type_colors[sub.class_type];
+    Color background = type_colors[sub.class_type];
     Element block = vbox(content) | size(HEIGHT, EQUAL, height) |
-                    bgcolor(background) | color(Color::White);
+                    bgcolor(background) | color(block_text);
     if (e.conflict) {
         block = block | bold;
     }
@@ -281,13 +286,13 @@ Element legend(const plan &p, const catalog &cat) {
     for (int t = 0; t <= OTHER; t++) {
         if (used[t]) {
             chips.push_back(text(string(" ") + type_names[t] + " ") |
-                            bgcolor(type_colors[t]) | color(Color::White));
+                            bgcolor(type_colors[t]) | color(block_text));
             chips.push_back(text(" "));
         }
     }
     if (p.conflicts > 0) {
         chips.push_back(text(" konflikt ") | bgcolor(conflict_color) |
-                        color(Color::White) | bold);
+                        color(block_text) | bold);
         chips.push_back(text(" "));
     }
     return hbox(chips);
