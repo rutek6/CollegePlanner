@@ -1,5 +1,3 @@
-#include "tui.h"
-
 #include <algorithm>
 #include <deque>
 #include <fstream>
@@ -19,6 +17,7 @@
 #include "input_usos.h"
 #include "output.h"
 #include "solver.h"
+#include "tui.h"
 
 using namespace std;
 using namespace ftxui;
@@ -27,7 +26,7 @@ using namespace ftxui;
 struct grid_entry {
     int group_id;
     slot s;
-    bool conflict; // nakłada się z innym terminem planu
+    bool conflict;  // nakłada się z innym terminem planu
 };
 
 // Ciemne tła typów zajęć (indeksowane enum type) w palecie Dragon karmazyn
@@ -35,13 +34,13 @@ struct grid_entry {
 // motywu, każde z kontrastem co najmniej 7:1 z block_text. Konflikty zawsze
 // na jaskrawym karmazynowym akcencie motywu.
 const Color type_colors[] = {
-    Color::RGB(0x8B, 0x28, 0x2C), // CW    - karmazynowy
-    Color::RGB(0x78, 0x33, 0x5B), // LAB   - śliwkowy
-    Color::RGB(0x7E, 0x36, 0x24), // WYK   - rdzawy
-    Color::RGB(0x80, 0x2D, 0x4A), // CWW   - winny
-    Color::RGB(0x6E, 0x41, 0x20), // WF    - miedziany
-    Color::RGB(0x66, 0x3D, 0x66), // SEM   - wrzosowy
-    Color::RGB(0x56, 0x49, 0x47), // OTHER - ciepły szary
+    Color::RGB(0x8B, 0x28, 0x2C),  // CW    - karmazynowy
+    Color::RGB(0x78, 0x33, 0x5B),  // LAB   - śliwkowy
+    Color::RGB(0x7E, 0x36, 0x24),  // WYK   - rdzawy
+    Color::RGB(0x80, 0x2D, 0x4A),  // CWW   - winny
+    Color::RGB(0x6E, 0x41, 0x20),  // WF    - miedziany
+    Color::RGB(0x66, 0x3D, 0x66),  // SEM   - wrzosowy
+    Color::RGB(0x56, 0x49, 0x47),  // OTHER - ciepły szary
 };
 static_assert(sizeof(type_colors) / sizeof(type_colors[0]) == OTHER + 1,
               "każdy typ zajęć musi mieć swój kolor");
@@ -72,10 +71,10 @@ int to_row(int minute, int first_minute, int minutes_per_row) {
     return (minute - first_minute + minutes_per_row / 2) / minutes_per_row;
 }
 
-Element class_block(const grid_entry &e, const catalog &cat, int height) {
-    const group &g = cat.groups[e.group_id];
-    const sub_course &sub = cat.sub_courses[g.sub_id];
-    const course &c = cat.courses[sub.course_id];
+Element class_block(const grid_entry& e, const catalog& cat, int height) {
+    const group& g = cat.groups[e.group_id];
+    const sub_course& sub = cat.sub_courses[g.sub_id];
+    const course& c = cat.courses[sub.course_id];
 
     // Tyle linii, ile mieści się w wysokości bloku.
     vector<string> lines = {
@@ -103,16 +102,10 @@ Element empty_rows(int height) {
     return emptyElement() | size(HEIGHT, EQUAL, height);
 }
 
-Element day_column(int day,
-                   vector<grid_entry> entries,
-                   const catalog &cat,
-                   int first_minute,
-                   int rows,
-                   int minutes_per_row,
-                   int width) {
-    sort(entries.begin(),
-         entries.end(),
-         [](const grid_entry &a, const grid_entry &b) {
+Element day_column(int day, vector<grid_entry> entries, const catalog& cat,
+                   int first_minute, int rows, int minutes_per_row, int width) {
+    sort(entries.begin(), entries.end(),
+         [](const grid_entry& a, const grid_entry& b) {
              return a.s.start < b.s.start;
          });
 
@@ -154,7 +147,7 @@ Element day_column(int day,
         vector<Elements> lane_cells(lanes.size());
         vector<int> lane_row(lanes.size(), begin_row);
         for (size_t l = 0; l < lanes.size(); l++) {
-            for (const grid_entry &e : lanes[l]) {
+            for (const grid_entry& e : lanes[l]) {
                 int start =
                     max(to_row(e.s.start, first_minute, minutes_per_row),
                         lane_row[l]);
@@ -216,14 +209,14 @@ Element time_axis(int first_minute, int rows, int minutes_per_row) {
     return vbox(cells) | size(WIDTH, EQUAL, time_axis_width);
 }
 
-Element week_grid(const plan &p, const catalog &cat) {
+Element week_grid(const plan& p, const catalog& cat) {
     if (p.chosen.empty()) {
         return text("Nie znaleziono planu spełniającego preferencje") | center;
     }
 
     vector<grid_entry> entries;
     for (int group_id : p.chosen) {
-        for (const slot &s : cat.groups[group_id].slots) {
+        for (const slot& s : cat.groups[group_id].slots) {
             entries.push_back({group_id, s, false});
         }
     }
@@ -240,8 +233,8 @@ Element week_grid(const plan &p, const catalog &cat) {
     // godziny po ostatnich.
     int first_minute = 24 * 60;
     int last_minute = 0;
-    int last_day = 4; // Pn-Pt zawsze, So/Nd tylko gdy są w nich zajęcia
-    for (const grid_entry &e : entries) {
+    int last_day = 4;  // Pn-Pt zawsze, So/Nd tylko gdy są w nich zajęcia
+    for (const grid_entry& e : entries) {
         first_minute = min(first_minute, e.s.start);
         last_minute = max(last_minute, e.s.end);
         last_day = max(last_day, e.s.day);
@@ -263,21 +256,21 @@ Element week_grid(const plan &p, const catalog &cat) {
     Elements columns = {time_axis(first_minute, rows, minutes_per_row)};
     for (int day = 0; day <= last_day; day++) {
         vector<grid_entry> day_entries;
-        for (const grid_entry &e : entries) {
+        for (const grid_entry& e : entries) {
             if (e.s.day == day) {
                 day_entries.push_back(e);
             }
         }
         columns.push_back(separator());
         int width = day_width + (day < wider_days ? 1 : 0);
-        columns.push_back(day_column(
-            day, day_entries, cat, first_minute, rows, minutes_per_row, width));
+        columns.push_back(day_column(day, day_entries, cat, first_minute, rows,
+                                     minutes_per_row, width));
     }
     return hbox(columns);
 }
 
 // Legenda kolorów: typy zajęć występujące w planie (+ konflikt, jeśli jest).
-Element legend(const plan &p, const catalog &cat) {
+Element legend(const plan& p, const catalog& cat) {
     bool used[OTHER + 1] = {};
     for (int group_id : p.chosen) {
         used[cat.sub_courses[cat.groups[group_id].sub_id].class_type] = true;
@@ -306,15 +299,15 @@ Element legend(const plan &p, const catalog &cat) {
 // bool*, Input - string. Zmiany trafiają do prefs dopiero po zapisie.
 struct prefs_editor {
     bool free_days[5];
-    string start[5]; // "HH:MM"
+    string start[5];  // "HH:MM"
     string end[5];
-    deque<bool> pinned; // pinned[id grupy]; deque nie przenosi elementów,
-                        // więc wskaźniki dane Checkboxom zostają ważne
-    string path;        // plik, do którego zapisujemy
-    string error;       // komunikat błędu pod przyciskami
+    deque<bool> pinned;  // pinned[id grupy]; deque nie przenosi elementów,
+                         // więc wskaźniki dane Checkboxom zostają ważne
+    string path;         // plik, do którego zapisujemy
+    string error;        // komunikat błędu pod przyciskami
 };
 
-void load_editor(prefs_editor &editor, const prefs &preferences) {
+void load_editor(prefs_editor& editor, const prefs& preferences) {
     for (int day = 0; day < 5; day++) {
         editor.free_days[day] = preferences.free_days[day];
         editor.start[day] = format_time(get<0>(preferences.hours[day]));
@@ -331,11 +324,11 @@ void load_editor(prefs_editor &editor, const prefs &preferences) {
 
 // Przepisuje stan edytora do result. Przy błędnej godzinie zwraca false
 // i ustawia editor.error.
-bool editor_to_prefs(prefs_editor &editor, prefs &result) {
+bool editor_to_prefs(prefs_editor& editor, prefs& result) {
     for (int day = 0; day < 5; day++) {
         int start, end;
-        if (!parse_time_range(
-                editor.start[day] + "-" + editor.end[day], start, end)) {
+        if (!parse_time_range(editor.start[day] + "-" + editor.end[day], start,
+                              end)) {
             editor.error = string(day_names[day]) +
                            ": niepoprawna godzina (oczekiwano HH:MM)";
             return false;
@@ -358,7 +351,7 @@ bool editor_to_prefs(prefs_editor &editor, prefs &result) {
 }
 
 // "5 (Pn 12:15, Cz 10:15)" - numer grupy i początki jej zajęć.
-string group_label(const group &g) {
+string group_label(const group& g) {
     string label = to_string(g.nr) + " (";
     for (size_t i = 0; i < g.slots.size(); i++) {
         if (i > 0) {
@@ -370,7 +363,7 @@ string group_label(const group &g) {
     return label + ")";
 }
 
-Component time_input(string *content) {
+Component time_input(string* content) {
     InputOption option;
     option.multiline = false;
     Component input = Input(content, "HH:MM", option);
@@ -380,8 +373,7 @@ Component time_input(string *content) {
     });
 }
 
-Component build_prefs_panel(prefs_editor &editor,
-                            const catalog &cat,
+Component build_prefs_panel(prefs_editor& editor, const catalog& cat,
                             function<void()> on_save,
                             function<void()> on_cancel) {
     // Dni: wolny dzień i zakres godzin, w którym mogą być zajęcia.
@@ -394,11 +386,8 @@ Component build_prefs_panel(prefs_editor &editor,
         day_rows.push_back(Renderer(row, [=] {
             return hbox(
                 {text(string(" ") + day_names[day]) | size(WIDTH, EQUAL, 4),
-                 free_day->Render(),
-                 text("   od "),
-                 start->Render(),
-                 text(" do "),
-                 end->Render()});
+                 free_day->Render(), text("   od "), start->Render(),
+                 text(" do "), end->Render()});
         }));
     }
     Component days = Container::Vertical(day_rows);
@@ -407,10 +396,10 @@ Component build_prefs_panel(prefs_editor &editor,
     // W kontenerze są tylko wiersze z polami (nagłówki przedmiotów nie mogą
     // dostawać fokusu), nagłówki dorysowujemy przy renderowaniu.
     Components pin_rows;
-    vector<string> header_before; // nazwa przedmiotu przed wierszem albo ""
-    for (const course &c : cat.courses) {
+    vector<string> header_before;  // nazwa przedmiotu przed wierszem albo ""
+    for (const course& c : cat.courses) {
         for (int sub_id : c.sub_ids) {
-            const sub_course &sub = cat.sub_courses[sub_id];
+            const sub_course& sub = cat.sub_courses[sub_id];
             Components boxes;
             for (int group_id : sub.group_ids) {
                 boxes.push_back(Checkbox(group_label(cat.groups[group_id]),
@@ -420,7 +409,7 @@ Component build_prefs_panel(prefs_editor &editor,
             string type_label = string("   ") + type_names[sub.class_type];
             pin_rows.push_back(Renderer(row, [=] {
                 Elements rendered;
-                for (const Component &box : boxes) {
+                for (const Component& box : boxes) {
                     rendered.push_back(hbox({box->Render(), text("  ")}));
                 }
                 return hbox({text(type_label) | size(WIDTH, EQUAL, 9),
@@ -461,12 +450,8 @@ Component build_prefs_panel(prefs_editor &editor,
             pins->Render() | vscroll_indicator | yframe | flex,
             separator(),
             hbox({text(" Plik: "), path->Render() | flex}),
-            hbox({text(" "),
-                  save->Render(),
-                  text(" "),
-                  cancel->Render(),
-                  text("  "),
-                  text(editor.error) | color(Color::Red) | bold}),
+            hbox({text(" "), save->Render(), text(" "), cancel->Render(),
+                  text("  "), text(editor.error) | color(Color::Red) | bold}),
         });
     });
 }
@@ -483,23 +468,23 @@ struct group_key {
     int nr;
 };
 
-vector<group_key> keys_of(const catalog &cat, const vector<int> &group_ids) {
+vector<group_key> keys_of(const catalog& cat, const vector<int>& group_ids) {
     vector<group_key> keys;
     for (int group_id : group_ids) {
-        const group &g = cat.groups[group_id];
-        const sub_course &sub = cat.sub_courses[g.sub_id];
+        const group& g = cat.groups[group_id];
+        const sub_course& sub = cat.sub_courses[g.sub_id];
         keys.push_back({cat.courses[sub.course_id].name, sub.class_type, g.nr});
     }
     return keys;
 }
 
 // id grup z keys w cat; grup, których nie ma, po prostu brak w wyniku.
-vector<int> ids_of(const catalog &cat, const vector<group_key> &keys) {
+vector<int> ids_of(const catalog& cat, const vector<group_key>& keys) {
     vector<int> ids;
-    for (const group_key &key : keys) {
+    for (const group_key& key : keys) {
         for (size_t id = 0; id < cat.groups.size(); id++) {
-            const group &g = cat.groups[id];
-            const sub_course &sub = cat.sub_courses[g.sub_id];
+            const group& g = cat.groups[id];
+            const sub_course& sub = cat.sub_courses[g.sub_id];
             if (g.nr == key.nr && sub.class_type == key.class_type &&
                 cat.courses[sub.course_id].name == key.course_name) {
                 ids.push_back(id);
@@ -512,18 +497,15 @@ vector<int> ids_of(const catalog &cat, const vector<group_key> &keys) {
 
 // ---------------------------------------------------------------------------
 
-void run_tui(string data_path,
-             catalog cat,
-             vector<vector<CONFLICT_TYPE>> conflicts,
-             prefs &preferences,
-             vector<plan> plans,
-             const string &prefs_path) {
+void run_tui(string data_path, catalog cat,
+             vector<vector<CONFLICT_TYPE>> conflicts, prefs& preferences,
+             vector<plan> plans, const string& prefs_path) {
     App app = App::Fullscreen();
 
-    const plan no_plan; // pusty plan - week_grid pokaże komunikat
-    int current = 0;    // numer oglądanego planu (od 0)
-    int mode = 0;       // 0 - plan, 1 - panel preferencji, 2 - otwieranie pliku
-    string status;      // komunikat w nagłówku, np. po zapisie
+    const plan no_plan;  // pusty plan - week_grid pokaże komunikat
+    int current = 0;     // numer oglądanego planu (od 0)
+    int mode = 0;   // 0 - plan, 1 - panel preferencji, 2 - otwieranie pliku
+    string status;  // komunikat w nagłówku, np. po zapisie
 
     // Edytor i panel preferencji zależą od danych (pola przy grupach), więc
     // po wczytaniu nowego pliku budujemy je od nowa - stąd unique_ptr.
@@ -531,7 +513,7 @@ void run_tui(string data_path,
     editor->pinned.resize(cat.groups.size());
     editor->path = prefs_path;
 
-    string open_path = data_path; // pole w oknie "Otwórz plik"
+    string open_path = data_path;  // pole w oknie "Otwórz plik"
     string open_error;
 
     // Obliczenia (przeliczanie planów, wczytywanie pliku) robi osobny wątek,
@@ -544,15 +526,17 @@ void run_tui(string data_path,
     auto start_worker = [&](function<void()> task) {
         computing = true;
         if (worker.joinable()) {
-            worker.join(); // poprzedni wątek już skończył (computing == false)
+            worker.join();  // poprzedni wątek już skończył (computing == false)
         }
         worker = thread([&app, task] {
             task();
-            app.PostEvent(Event::Custom); // samo Post nie odświeża ekranu
+            app.PostEvent(Event::Custom);  // samo Post nie odświeża ekranu
         });
     };
 
-    auto close_panel = [&] { mode = 0; };
+    auto close_panel = [&] {
+        mode = 0;
+    };
     auto save = [&] {
         if (computing) {
             editor->error = "poprzednie obliczenia jeszcze trwają";
@@ -587,7 +571,7 @@ void run_tui(string data_path,
     Component panel_slot = Container::Vertical({});
     auto rebuild_panel = [&] {
         string path = editor->path;
-        panel_slot->DetachAllChildren(); // najpierw komponenty, potem edytor
+        panel_slot->DetachAllChildren();  // najpierw komponenty, potem edytor
         editor = make_unique<prefs_editor>();
         editor->pinned.resize(cat.groups.size());
         editor->path = path;
@@ -616,14 +600,8 @@ void run_tui(string data_path,
                 int warning_count =
                     count(warnings.begin(), warnings.end(), '\n');
                 int lost_pins = pinned.size() - base.required_group_ids.size();
-                app.Post([&,
-                          new_cat,
-                          new_conflicts,
-                          new_plans,
-                          base,
-                          path,
-                          warning_count,
-                          lost_pins] {
+                app.Post([&, new_cat, new_conflicts, new_plans, base, path,
+                          warning_count, lost_pins] {
                     cat = new_cat;
                     conflicts = new_conflicts;
                     plans = new_plans;
@@ -643,7 +621,7 @@ void run_tui(string data_path,
                     }
                     computing = false;
                 });
-            } catch (const input_exception &e) {
+            } catch (const input_exception& e) {
                 string message = e.what();
                 app.Post([&, message] {
                     status = message;
@@ -658,14 +636,13 @@ void run_tui(string data_path,
     // aktualny plan dopasowany do okna.
     Component plan_view = Renderer([&] {
         int plan_count = plans.size();
-        const plan &p = plan_count > 0 ? plans[current] : no_plan;
+        const plan& p = plan_count > 0 ? plans[current] : no_plan;
 
         Element conflicts_info =
             text("Konflikty: " + to_string(p.conflicts) + " ");
         if (p.chosen.empty()) {
-            conflicts_info = text(""); // brak planu - liczba nic nie znaczy
-        }
-        else if (p.conflicts > 0) {
+            conflicts_info = text("");  // brak planu - liczba nic nie znaczy
+        } else if (p.conflicts > 0) {
             conflicts_info = conflicts_info | color(Color::Red) | bold;
         }
 
@@ -684,10 +661,7 @@ void run_tui(string data_path,
                    hbox({text(" CollegePlanner") | bold,
                          text(" - " + data_path),
                          text(status.empty() ? "" : "  (" + status + ")") | dim,
-                         filler(),
-                         plan_number,
-                         filler(),
-                         conflicts_info}),
+                         filler(), plan_number, filler(), conflicts_info}),
                    separator(),
                    week_grid(p, cat) | flex,
                    separator(),
@@ -698,8 +672,7 @@ void run_tui(string data_path,
 
     Component prefs_view = Renderer(panel_slot, [&] {
         return vbox({
-                   hbox({text(" CollegePlanner - preferencje") | bold,
-                         filler(),
+                   hbox({text(" CollegePlanner - preferencje") | bold, filler(),
                          text("strzałki - poruszanie   Spacja/Enter - "
                               "zaznacz   Esc - anuluj ") |
                              dim}),
@@ -720,8 +693,7 @@ void run_tui(string data_path,
         {open_input, Container::Horizontal({open_button, open_cancel})});
     Component open_view = Renderer(open_form, [&] {
         return vbox({
-                   hbox({text(" CollegePlanner - otwórz plik") | bold,
-                         filler(),
+                   hbox({text(" CollegePlanner - otwórz plik") | bold, filler(),
                          text("Enter - wczytaj   Esc - anuluj ") | dim}),
                    separator(),
                    text(" Plan z USOSweb (.html) przejdzie przez parser "
@@ -731,11 +703,8 @@ void run_tui(string data_path,
                    text(""),
                    hbox({text(" Plik: "), open_input->Render() | flex}),
                    text(""),
-                   hbox({text(" "),
-                         open_button->Render(),
-                         text(" "),
-                         open_cancel->Render(),
-                         text("  "),
+                   hbox({text(" "), open_button->Render(), text(" "),
+                         open_cancel->Render(), text("  "),
                          text(open_error) | color(Color::Red) | bold}),
                    filler(),
                }) |

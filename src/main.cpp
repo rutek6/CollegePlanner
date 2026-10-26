@@ -14,7 +14,7 @@
 
 using namespace std;
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     if (argc < 2) {
         cerr << "Użycie " << argv[0]
              << " <plik z danymi .in albo plan z USOS .html> [preferencje]\n";
@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
             }
             read_prefs(preferences, cat, input, cout);
         }
-    } catch (const input_exception &e) {
+    } catch (const input_exception& e) {
         cerr << e.what() << '\n';
         return 1;
     }
