@@ -2,10 +2,10 @@ PnGodziny 00:00-24:00
 WtGodziny 00:00-24:00
 SrGodziny 00:00-24:00
 CzGodziny 00:00-24:00
-PtGodziny 00:00-14:00
+PtGodziny 00:00-24:00
 
 PnCzyWolne false
 WtCzyWolne false
 SrCzyWolne false
 CzCzyWolne false
-PtCzyWolne false
+PtCzyWolne true

@@ -11,6 +11,6 @@
 // preferences.required_group_ids
 // to id grup (indeksy w cat.groups). W pod-przedmiocie, w którym wybrano
 // jakąś grupę, rozważane są tylko wybrane grupy.
-vector<plan> generate_plans(const catalog &cat,
-                            prefs preferences,
-                            const vector<vector<CONFLICT_TYPE>> &conflicts);
+std::vector<plan> generate_plans(
+    const catalog& cat, prefs preferences,
+    const std::vector<std::vector<CONFLICT_TYPE>>& conflicts);
