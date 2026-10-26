@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <cstddef>
 #include <string>
 #include <vector>
@@ -10,16 +11,16 @@ enum CONFLICT_TYPE { NONE, HARD, SOFT };
 
 // Nazwy typów zajęć i dni tygodnia - indeksowane wartościami
 // enum type oraz slot::day. Używane przy wczytywaniu i wypisywaniu.
-extern const char *type_names[];
+extern const char* type_names[];
 extern const int type_count;
-extern const char *day_names[];
+extern const char* day_names[];
 extern const int day_count;
 
 class slot {
-  public:
-    int start; // minutes from 00:00
+   public:
+    int start;  // minutes from 00:00
     int end;
-    int day; // Monday - 0, Friday - 4;
+    int day;  // Monday - 0, Friday - 4;
 
     bool is_conflict(slot second) const;
 };
@@ -30,40 +31,54 @@ class slot {
 // Obiekty wskazują na siebie nawzajem przez id (w dół i w górę).
 
 class group {
-  public:
+   public:
     std::vector<slot> slots;
-    int nr;     // numer grupy z USOS - tylko etykieta do wypisania, NIE id
-    int sub_id; // pod-przedmiot, do którego należy grupa
+    int nr;      // numer grupy z USOS - tylko etykieta do wypisania, NIE id
+    int sub_id;  // pod-przedmiot, do którego należy grupa
     bool is_conflict(group second) const;
 };
 
 class sub_course {
-  public:
+   public:
     std::vector<int> group_ids;
     type class_type;
-    int course_id; // przedmiot, do którego należy pod-przedmiot
+    int course_id;  // przedmiot, do którego należy pod-przedmiot
 };
 
 class course {
-  public:
+   public:
     std::vector<int> sub_ids;
     std::string name;
 };
 
 class catalog {
-  public:
+   public:
     std::vector<course> courses;
     std::vector<sub_course> sub_courses;
     std::vector<group> groups;
 };
 
+struct plan_parameters {
+    int min_start[7] = {24 * 60};
+    int max_end[7] = {0};
+    size_t soft_conflicts = 0;
+    size_t hard_conflicts = 0;
+    size_t penalty = 0;
+
+    plan_parameters() {
+        std::fill(min_start, min_start + 7, 24 * 60);
+        std::fill(max_end, max_end + 7, 0);
+    }
+};
+
 class plan {
-  public:
+   public:
     // chosen[k] = id grupy wybranej w pod-przedmiocie o id k
     std::vector<int> chosen;
-    size_t conflicts = 0; // ustawiane przez solver
+    plan_parameters params;
+    size_t conflicts = 0;  // ustawiane przez solver
     size_t calculate_conflicts(
-        const std::vector<std::vector<CONFLICT_TYPE>> &conflicts);
+        const std::vector<std::vector<CONFLICT_TYPE>>& conflicts);
     size_t calculate_soft_conflicts(
-        const std::vector<std::vector<CONFLICT_TYPE>> &conflicts);
+        const std::vector<std::vector<CONFLICT_TYPE>>& conflicts);
 };

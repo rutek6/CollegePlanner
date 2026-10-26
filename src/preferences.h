@@ -23,6 +23,6 @@ struct prefs {
     std::vector<int>
         required_group_ids;  // id grup, czyli indeksy w catalog::groups
     std::unordered_map<weights, size_t> weights_map = {
-        {HARD_CONFLICT, 1000000}, {SOFT_CONFLICT, 100000}, {TIME, 10},
+        {HARD_CONFLICT, 1000000}, {SOFT_CONFLICT, 100000}, {TIME, 5},
         {TIME_SPENT, 5},          {EARLY_START, 0},        {LATE_END, 5}};
 };

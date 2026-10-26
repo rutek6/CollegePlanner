@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include "conflict.h"
+#include "model.h"
 #include "preferences.h"
 
 using namespace std;
@@ -22,26 +23,15 @@ bool group_fits_prefs(const group& g, const prefs& preferences) {
     return true;
 }
 
-int time_cost(const plan& p, const catalog& cat, const prefs& preferences) {
+int time_cost(plan& p, const prefs& preferences) {
     int total_time_spent = 0;
     int late_end_penalty = 0;
     int early_start_penalty = 0;
-    for (int day = 0; day < day_count; day++) {
-        int min_start = 24 * 60, max_end = 0;
 
-        for (size_t i = 0; i < p.chosen.size(); i++) {
-            const group& g = cat.groups[p.chosen[i]];
-            for (const slot& s : g.slots) {
-                if (s.day == day) {
-                    if (s.start < min_start) {
-                        min_start = s.start;
-                    }
-                    if (s.end > max_end) {
-                        max_end = s.end;
-                    }
-                }
-            }
-        }
+    for (int day = 0; day < day_count; day++) {
+        int& min_start = p.params.min_start[day];
+        int& max_end = p.params.max_end[day];
+
         if (max_end <= min_start) {
             continue;  // dzień bez zajęć nic nie kosztuje
         }
@@ -58,22 +48,44 @@ int time_cost(const plan& p, const catalog& cat, const prefs& preferences) {
            preferences.weights_map.at(EARLY_START) * early_start_penalty;
 }
 
-size_t calculate_penalty(plan& current_plan, const prefs& preferences,
+size_t calculate_penalty(plan& current_plan, int current_group_id,
+                         const prefs& preferences,
                          const vector<vector<CONFLICT_TYPE>>& conflicts,
                          const catalog& cat) {
-    size_t nr_of_conflicts = current_plan.calculate_conflicts(conflicts);
-    size_t nr_of_soft_conflicts =
-        current_plan.calculate_soft_conflicts(conflicts);
-    int current_time_cost = time_cost(current_plan, cat, preferences);
 
-    size_t result =
-        nr_of_conflicts * preferences.weights_map.at(HARD_CONFLICT) +
-        nr_of_soft_conflicts * preferences.weights_map.at(SOFT_CONFLICT) +
-        current_time_cost * preferences.weights_map.at(TIME);
+    // Count hard and soft conflicts
+    size_t current_soft_conflicts = 0, current_hard_conflicts = 0;
+    for (int group_id : current_plan.chosen) {
+        if (conflicts[group_id][current_group_id] == HARD) {
+            current_hard_conflicts++;
+        } else if (conflicts[group_id][current_group_id] == SOFT) {
+            current_soft_conflicts++;
+        }
+    }
+    for (slot group_slot : cat.groups[current_group_id].slots) {
+        current_plan.params.min_start[group_slot.day] = std::min(
+            current_plan.params.min_start[group_slot.day], group_slot.start);
+        current_plan.params.max_end[group_slot.day] = std::max(
+            current_plan.params.max_end[group_slot.day], group_slot.end);
+    }
+
+    size_t hard_conflicts =
+        current_plan.params.hard_conflicts + current_hard_conflicts;
+    size_t soft_conflicts =
+        current_plan.params.soft_conflicts + current_soft_conflicts;
+    int current_time_cost = time_cost(current_plan, preferences);
+
+    current_plan.params.hard_conflicts = hard_conflicts;
+    current_plan.params.soft_conflicts = soft_conflicts;
+
+    size_t result = hard_conflicts * preferences.weights_map.at(HARD_CONFLICT) +
+                    soft_conflicts * preferences.weights_map.at(SOFT_CONFLICT) +
+                    current_time_cost * preferences.weights_map.at(TIME);
+    current_plan.params.penalty = result;
     return result;
 }
 
-void dfs(plan current_plan, vector<plan>& contenders, size_t& result_penalty,
+void dfs(plan& current_plan, vector<plan>& contenders, size_t& result_penalty,
          const vector<vector<CONFLICT_TYPE>>& conflicts, const catalog& cat,
          const vector<vector<int>>& allowed, const prefs& preferences,
          int index, int end) {
@@ -82,8 +94,7 @@ void dfs(plan current_plan, vector<plan>& contenders, size_t& result_penalty,
     //     return;
     // }
     if (index == end) {
-        size_t penalty =
-            calculate_penalty(current_plan, preferences, conflicts, cat);
+        size_t penalty = current_plan.params.penalty;
 
         if (penalty < result_penalty) {
             result_penalty = penalty;
@@ -99,18 +110,21 @@ void dfs(plan current_plan, vector<plan>& contenders, size_t& result_penalty,
         if (!group_fits_prefs(cat.groups[group_id], preferences)) {
             continue;
         }
-        current_plan.chosen.push_back(group_id);
 
-        if (calculate_penalty(current_plan, preferences, conflicts, cat) >
-            result_penalty) {
-            current_plan.chosen.pop_back();
+        plan_parameters current_parameters = current_plan.params;
+        if (calculate_penalty(current_plan, group_id, preferences, conflicts,
+                              cat) > result_penalty) {
+            current_plan.params = current_parameters;
             continue;
         }
+
+        current_plan.chosen.push_back(group_id);
 
         dfs(current_plan, contenders, result_penalty, conflicts, cat, allowed,
             preferences, index + 1, end);
 
         current_plan.chosen.pop_back();
+        current_plan.params = current_parameters;
     }
 }
 

@@ -1,5 +1,5 @@
 CXX      = g++
-CXXFLAGS = -std=c++17 -O2 -Wall -Wextra -MMD -MP
+CXXFLAGS = -std=c++17 -O2 -Wall -Wextra -MMD -MP -Wunused
 SRC      = $(wildcard src/*.cpp)
 OBJ      = $(SRC:src/%.cpp=build/%.o)
 # FTXUI (AUR: yay -S ftxui). Kolejność ma znaczenie: component -> dom -> screen
