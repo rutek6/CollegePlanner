@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <iostream>
 #include "conflict.h"
 #include "model.h"
 #include "preferences.h"
@@ -90,9 +91,6 @@ void dfs(plan& current_plan, vector<plan>& contenders, size_t& result_penalty,
          const vector<vector<int>>& allowed, const prefs& preferences,
          int index, int end) {
 
-    // if (result_conflicts == 0) {
-    //     return;
-    // }
     if (index == end) {
         size_t penalty = current_plan.params.penalty;
 
@@ -107,10 +105,6 @@ void dfs(plan& current_plan, vector<plan>& contenders, size_t& result_penalty,
     }
 
     for (int group_id : allowed[index]) {
-        if (!group_fits_prefs(cat.groups[group_id], preferences)) {
-            continue;
-        }
-
         plan_parameters current_parameters = current_plan.params;
         if (calculate_penalty(current_plan, group_id, preferences, conflicts,
                               cat) > result_penalty) {
@@ -130,8 +124,8 @@ void dfs(plan& current_plan, vector<plan>& contenders, size_t& result_penalty,
 
 vector<plan> generate_plans(const catalog& cat, prefs preferences,
                             const vector<vector<CONFLICT_TYPE>>& conflicts) {
-    vector<plan> contenders;           // wszystkie równoważne najlepsze plany
-    size_t result_penalty = SIZE_MAX;  // każdy pełny plan będzie lepszy
+    vector<plan> contenders;          // wszystkie równoważne najlepsze plany
+    size_t result_penalty = 4000000;  // każdy pełny plan ma być lepszy.
 
     // allowed[k] - id grup pod-przedmiotu k, które dfs rozważa: przypięte,
     // a jeśli w tym pod-przedmiocie nic nie przypięto - wszystkie.
@@ -149,8 +143,23 @@ vector<plan> generate_plans(const catalog& cat, prefs preferences,
         allowed.push_back(required.empty() ? sub.group_ids : required);
     }
 
+    // Od razu usuwamy grupy niepasujące do preferencji
+    for (vector<int> vec : allowed) {
+        for (auto it = vec.begin(); it != vec.end(); ++it) {
+            if (!group_fits_prefs(cat.groups[*it], preferences)) {
+                vec.erase(it);
+            }
+        }
+    }
+
+    // Sortujemy kursy w allowed rosnąco po liczbie grup, aby przyspieszyć odcinanie krawędzi w dfs.
+    sort(allowed.begin(), allowed.end(),
+         [&](vector<int> a, vector<int> b) { return a.size() < b.size(); });
+
     plan new_plan;
     dfs(new_plan, contenders, result_penalty, conflicts, cat, allowed,
         preferences, 0, cat.sub_courses.size());
+    std::cout << contenders[0].params.penalty << endl;
+
     return contenders;
 }

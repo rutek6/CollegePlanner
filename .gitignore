@@ -16,3 +16,4 @@ __pycache__/
 *.in
 .fuse_hidden000104f500000001
 prefs.in
+/plany
