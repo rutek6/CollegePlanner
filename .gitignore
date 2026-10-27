@@ -11,6 +11,7 @@
 /solver
 /prefs.in
 *.txt
+!CMakeLists.txt
 __pycache__/
 *.html
 *.in
