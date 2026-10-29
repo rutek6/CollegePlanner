@@ -86,6 +86,31 @@ size_t calculate_penalty(plan& current_plan, int current_group_id,
     return result;
 }
 
+size_t find_penalty_limit(const vector<vector<int>>& groups, const catalog& cat,
+                          const prefs& preferences,
+                          const vector<vector<CONFLICT_TYPE>>& conflicts) {
+    plan result;
+    for (size_t i = 0; i < groups.size(); i++) {
+        plan_parameters current_params = result.params;
+        vector<int> group_ids = groups[i];
+        size_t min_penalty = SIZE_MAX;
+        plan_parameters best_params;
+        int best_group_id;
+        for (int j = 0; j < group_ids.size(); j++) {
+            if (calculate_penalty(result, group_ids[j], preferences, conflicts,
+                                  cat) < min_penalty) {
+                best_params = result.params;
+                best_group_id = group_ids[j];
+                min_penalty = best_params.penalty;
+            }
+            result.params = current_params;
+        }
+        result.params = best_params;
+        result.chosen.push_back(best_group_id);
+    }
+    return result.params.penalty;
+}
+
 void dfs(plan& current_plan, vector<plan>& contenders, size_t& result_penalty,
          const vector<vector<CONFLICT_TYPE>>& conflicts, const catalog& cat,
          const vector<vector<int>>& allowed, const prefs& preferences,
@@ -124,8 +149,7 @@ void dfs(plan& current_plan, vector<plan>& contenders, size_t& result_penalty,
 
 vector<plan> generate_plans(const catalog& cat, prefs preferences,
                             const vector<vector<CONFLICT_TYPE>>& conflicts) {
-    vector<plan> contenders;          // wszystkie równoważne najlepsze plany
-    size_t result_penalty = 4000000;  // każdy pełny plan ma być lepszy.
+    vector<plan> contenders;  // wszystkie równoważne najlepsze plany
 
     // allowed[k] - id grup pod-przedmiotu k, które dfs rozważa: przypięte,
     // a jeśli w tym pod-przedmiocie nic nie przypięto - wszystkie.
@@ -152,6 +176,12 @@ vector<plan> generate_plans(const catalog& cat, prefs preferences,
         }
     }
 
+    // size_t result_penalty = 4000000;  // każdy pełny plan ma być lepszy.
+    size_t result_penalty =
+        find_penalty_limit(allowed, cat, preferences, conflicts);
+
+    cout << "RESULT_PENALTY: " << result_penalty << endl;
+
     // Sortujemy kursy w allowed rosnąco po liczbie grup, aby przyspieszyć odcinanie krawędzi w dfs.
     sort(allowed.begin(), allowed.end(),
          [&](vector<int> a, vector<int> b) { return a.size() < b.size(); });
@@ -159,7 +189,7 @@ vector<plan> generate_plans(const catalog& cat, prefs preferences,
     plan new_plan;
     dfs(new_plan, contenders, result_penalty, conflicts, cat, allowed,
         preferences, 0, cat.sub_courses.size());
-    std::cout << contenders[0].params.penalty << endl;
+    std::cout << "FINAL PENALTY: " << contenders[0].params.penalty << endl;
 
     return contenders;
 }

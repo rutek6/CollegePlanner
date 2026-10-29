@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.10.0)
 project(CollegePlanner VERSION 0.1.0 LANGUAGES C CXX)
 
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Typ buildu" FORCE)
+endif()
 
 find_package(ftxui CONFIG QUIET)
 
